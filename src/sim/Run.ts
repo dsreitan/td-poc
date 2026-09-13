@@ -9,6 +9,8 @@ import type { SimEvent, TaggedEvent } from "./events.ts";
 import { Backpack, type PlacementResult } from "./grid/Backpack.ts";
 import type { Cell, Orientation } from "./grid/shapes.ts";
 import { itemDef, SHOP_ITEM_DEFS } from "./items/defs.ts";
+import { canMerge, mergedTier } from "./items/merge.ts";
+import { findRecipe } from "./items/recipes.ts";
 import { tierData, type ItemDef, type Tier } from "./items/types.ts";
 import { DEFAULT_MODIFIERS, type RunModifiers } from "./modifiers.ts";
 import { Rng } from "./rng.ts";
@@ -27,6 +29,35 @@ export type BuyResult =
       readonly ok: false;
       readonly reason: "notEnoughGold" | "noOffer" | "locked" | "benchFull" | "benchEmpty";
     };
+
+/** What dropping `dragged` onto `target` would do. */
+export type CombineKind = "merge" | "craft";
+
+export interface CombinePreview {
+  readonly kind: CombineKind;
+  /** Resulting def id at the target's position. */
+  readonly resultDefId: string;
+  readonly resultTier: Tier;
+}
+
+export type CombineResult =
+  | { readonly ok: true; readonly kind: CombineKind; readonly resultId: string }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "noCombine"
+        | "doesNotFit"
+        | "locked"
+        | "notEnoughGold"
+        | "noOffer"
+        | "benchEmpty"
+        | "unknownItem";
+    };
+
+export type DragSource =
+  | { readonly from: "grid"; readonly itemId: string }
+  | { readonly from: "bench" }
+  | { readonly from: "offer"; readonly index: number };
 
 export const SHOP_SIZE = 4;
 export const REROLL_BASE_COST = 2;
@@ -230,6 +261,95 @@ export class Run {
   rotate(itemId: string): PlacementResult {
     if (this.locked) return { ok: false, reason: "unknownItem" };
     return this.backpack.rotate(itemId);
+  }
+
+  private sourceItem(src: DragSource): { defId: string; tier: Tier } | undefined {
+    if (src.from === "grid") {
+      const it = this.backpack.get(src.itemId);
+      return it ? { defId: it.defId, tier: it.tier } : undefined;
+    }
+    if (src.from === "bench")
+      return this._bench ? { defId: this._bench.defId, tier: this._bench.tier } : undefined;
+    const offer = this._offers[src.index];
+    return offer ? { defId: offer.defId, tier: 1 } : undefined;
+  }
+
+  /** Would dropping `src` onto grid item `targetId` merge or craft? */
+  previewCombine(src: DragSource, targetId: string): CombinePreview | undefined {
+    const target = this.backpack.get(targetId);
+    const dragged = this.sourceItem(src);
+    if (!target || !dragged) return undefined;
+    if (src.from === "grid" && src.itemId === targetId) return undefined;
+    if (canMerge(dragged, target))
+      return { kind: "merge", resultDefId: target.defId, resultTier: mergedTier(target.tier) };
+    const recipe = findRecipe(dragged.defId, target.defId);
+    if (recipe) {
+      // The result must fit where the target sits, in the target's orientation.
+      const shape = itemDef(recipe.result).shape;
+      if (this.backpack.canPlace(shape, target.orientation, target.anchor, targetId).ok) {
+        return { kind: "craft", resultDefId: recipe.result, resultTier: 1 };
+      }
+    }
+    return undefined;
+  }
+
+  /** Drop `src` onto grid item `targetId`. Consumes the source. Atomic. */
+  combine(src: DragSource, targetId: string): CombineResult {
+    if (this.locked) return { ok: false, reason: "locked" };
+    const target = this.backpack.get(targetId);
+    if (!target) return { ok: false, reason: "unknownItem" };
+    const preview = this.previewCombine(src, targetId);
+    if (!preview) {
+      const dragged = this.sourceItem(src);
+      if (dragged && findRecipe(dragged.defId, target.defId))
+        return { ok: false, reason: "doesNotFit" };
+      return { ok: false, reason: "noCombine" };
+    }
+    // Pay for / take the source first, checking affordability.
+    if (src.from === "offer") {
+      const offer = this._offers[src.index];
+      if (!offer) return { ok: false, reason: "noOffer" };
+      if (offer.cost > this._gold) return { ok: false, reason: "notEnoughGold" };
+      this._gold -= offer.cost;
+      this._offers[src.index] = null;
+    } else if (src.from === "bench") {
+      if (!this._bench) return { ok: false, reason: "benchEmpty" };
+      this._bench = null;
+    } else {
+      this.backpack.remove(src.itemId);
+    }
+    // Replace the target in place.
+    this.backpack.remove(targetId);
+    const resultId =
+      preview.kind === "merge" ? targetId : `${preview.resultDefId}#${this.nextItemId++}`;
+    const placed = this.backpack.place(
+      {
+        id: resultId,
+        defId: preview.resultDefId,
+        tier: preview.resultTier,
+        shape: itemDef(preview.resultDefId).shape,
+      },
+      target.anchor,
+      target.orientation,
+    );
+    if (!placed.ok)
+      throw new Error(`combine: result did not fit after preview said it would (${placed.reason})`);
+    return { ok: true, kind: preview.kind, resultId };
+  }
+
+  // --------------------------------------------------------------- ability
+
+  /** Volley: every weapon covering `lane` fires now at +50% damage. */
+  useAbility(lane: number): boolean {
+    if (this._phase !== "wave" || !this.sim) return false;
+    const events = this.sim.useVolley(lane).map((ev) => ({ tick: this.sim!.tick, ev }));
+    this.waveEvents.push(...events);
+    for (const { ev } of events) if (ev.t === "goldEarned") this._gold += ev.amount;
+    return events.length > 0;
+  }
+
+  get abilityCooldown(): number {
+    return this.sim?.volleyCooldown ?? 0;
   }
 
   // --------------------------------------------------------------- wave

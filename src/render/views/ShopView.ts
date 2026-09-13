@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { CONTENT, itemText, ui } from "../../content/index.ts";
-import type { Run } from "../../sim/Run.ts";
+import type { DragSource, Run } from "../../sim/Run.ts";
 import type { Orientation } from "../../sim/grid/shapes.ts";
 import { itemDef } from "../../sim/items/defs.ts";
 import {
@@ -31,6 +31,11 @@ interface Card {
   name: Phaser.GameObjects.Text;
   cost: Phaser.GameObjects.Text;
   home: { x: number; y: number };
+}
+
+interface Drop {
+  pointer: Phaser.Input.Pointer;
+  orientation: Orientation;
 }
 
 /** Row A: four offers + reroll. Row B: bench slot + start. Whole area is the sell zone. */
@@ -85,8 +90,15 @@ export class ShopView {
 
     for (let i = 0; i < 4; i++) {
       const home = { x: SHOP_X + i * SHOP_SLOT, y: SHOP_A_Y + 3 };
-      const card = this.createCard(home, SHOP_SLOT - 4, SHOP_A_H - 6, (o) => this.dropOffer(i, o));
-      this.offers.push(card);
+      this.offers.push(
+        this.createCard(
+          home,
+          SHOP_SLOT - 4,
+          SHOP_A_H - 6,
+          () => ({ from: "offer", index: i }),
+          (o) => this.dropOffer(i, o),
+        ),
+      );
     }
 
     this.rerollBtn = scene.add
@@ -116,8 +128,12 @@ export class ShopView {
         fontSize: "10px",
       })
       .setOrigin(0.5);
-    this.bench = this.createCard({ x: BENCH_X, y: SHOP_B_Y + 3 }, BENCH_W, SHOP_B_H - 6, (o) =>
-      this.dropBench(o),
+    this.bench = this.createCard(
+      { x: BENCH_X, y: SHOP_B_Y + 3 },
+      BENCH_W,
+      SHOP_B_H - 6,
+      () => ({ from: "bench" }),
+      (o) => this.dropBench(o),
     );
 
     this.startBtn = scene.add
@@ -136,12 +152,13 @@ export class ShopView {
     this.sync();
   }
 
-  /** A draggable card. `defIdAt` is resolved at drag time so cards can be reused. */
+  /** A draggable card. The def id is stored on the container so cards can be repainted. */
   private createCard(
     home: { x: number; y: number },
     w: number,
     h: number,
-    onDrop: (o: { pointer: Phaser.Input.Pointer; orientation: Orientation }) => void,
+    source: () => DragSource,
+    onDrop: (o: Drop) => void,
   ): Card {
     const body = this.scene.add
       .rectangle(0, 0, w, h, 0x000000)
@@ -178,7 +195,12 @@ export class ShopView {
     root.on("drag", (pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
       if (!dragging) return;
       root.setPosition(dragX, dragY);
-      this.backpackView.externalPreview(pointer, root.getData("defId") as string, orientation);
+      this.backpackView.externalPreview(
+        pointer,
+        root.getData("defId") as string,
+        orientation,
+        source(),
+      );
     });
     root.on("dragend", (pointer: Phaser.Input.Pointer) => {
       if (!dragging) return;
@@ -193,11 +215,13 @@ export class ShopView {
     return card;
   }
 
-  private dropOffer(
-    i: number,
-    o: { pointer: Phaser.Input.Pointer; orientation: Orientation },
-  ): void {
-    const { pointer, orientation } = o;
+  private dropOffer(i: number, { pointer, orientation }: Drop): void {
+    const src: DragSource = { from: "offer", index: i };
+    const target = this.backpackView.combineTargetAt(pointer, src);
+    if (target) {
+      if (!this.run.combine(src, target).ok) this.shake(this.offers[i]!.root);
+      return;
+    }
     if (inBench(pointer.x, pointer.y)) {
       if (!this.run.buyToBench(i).ok) this.shake(this.offers[i]!.root);
       return;
@@ -207,9 +231,14 @@ export class ShopView {
     if (!this.run.buy(i, anchor, orientation).ok) this.shake(this.offers[i]!.root);
   }
 
-  private dropBench(o: { pointer: Phaser.Input.Pointer; orientation: Orientation }): void {
-    const { pointer, orientation } = o;
+  private dropBench({ pointer, orientation }: Drop): void {
     if (inBench(pointer.x, pointer.y)) return;
+    const src: DragSource = { from: "bench" };
+    const target = this.backpackView.combineTargetAt(pointer, src);
+    if (target) {
+      if (!this.run.combine(src, target).ok) this.shake(this.bench.root);
+      return;
+    }
     const anchor = this.backpackView.anchorAt(pointer);
     if (anchor) {
       if (!this.run.fromBench(anchor, orientation).ok) this.shake(this.bench.root);

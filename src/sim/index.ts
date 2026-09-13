@@ -2,6 +2,8 @@ export * from "./grid/shapes.ts";
 export * from "./grid/Backpack.ts";
 export * from "./items/types.ts";
 export * from "./items/defs.ts";
+export * from "./items/merge.ts";
+export * from "./items/recipes.ts";
 export * from "./events.ts";
 export * from "./modifiers.ts";
 export * from "./combat/constants.ts";

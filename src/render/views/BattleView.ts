@@ -32,6 +32,9 @@ export class BattleView {
   private readonly layer: Phaser.GameObjects.Container;
   private baseLine!: Phaser.GameObjects.Rectangle;
   private readonly backpack: Backpack;
+  private readonly abilityBar: Phaser.GameObjects.Rectangle;
+  private readonly abilityText: Phaser.GameObjects.Text;
+  private onLaneTap: ((lane: number) => void) | undefined;
 
   constructor(scene: Phaser.Scene, backpack: Backpack) {
     this.scene = scene;
@@ -50,6 +53,47 @@ export class BattleView {
     }
     this.baseLine = scene.add.rectangle(0, BASE_Y, VIEW_W, 3, COLORS.accent).setOrigin(0, 0);
     this.layer = scene.add.container(0, 0);
+
+    // Tap a lane during a wave to fire Volley there.
+    const tapZone = scene.add
+      .rectangle(0, HUD_H, VIEW_W, BATTLE_H - HUD_H, 0x000000, 0)
+      .setOrigin(0, 0)
+      .setInteractive();
+    tapZone.on("pointerup", (pointer: Phaser.Input.Pointer) => {
+      this.onLaneTap?.(Math.max(0, Math.min(LANES - 1, Math.floor(pointer.x / LANE_W))));
+    });
+    this.abilityBar = scene.add
+      .rectangle(0, BASE_Y - 4, VIEW_W, 2, COLORS.gold)
+      .setOrigin(0, 0)
+      .setVisible(false)
+      .setDepth(8);
+    this.abilityText = scene.add
+      .text(VIEW_W / 2, BASE_Y - 12, "", {
+        fontFamily: "monospace",
+        fontSize: "10px",
+        color: "#ffc857",
+      })
+      .setOrigin(0.5, 1)
+      .setVisible(false)
+      .setDepth(8);
+  }
+
+  setLaneTapHandler(handler: ((lane: number) => void) | undefined): void {
+    this.onLaneTap = handler;
+  }
+
+  /** Ability readiness: full gold line when ready, shrinking while on cooldown. */
+  showAbility(cooldown: number, max: number, readyText: string): void {
+    const ready = cooldown === 0;
+    this.abilityBar.setVisible(true);
+    this.abilityBar.width = ready ? VIEW_W : VIEW_W * (1 - cooldown / max);
+    this.abilityBar.setFillStyle(ready ? COLORS.gold : COLORS.gridLine);
+    this.abilityText.setVisible(ready).setText(readyText);
+  }
+
+  hideAbility(): void {
+    this.abilityBar.setVisible(false);
+    this.abilityText.setVisible(false);
   }
 
   /** Highlight lanes covered by the item being dragged. */
@@ -126,6 +170,19 @@ export class BattleView {
           }
           break;
         }
+        case "abilityUsed": {
+          const flash = this.scene.add
+            .rectangle(ev.lane * LANE_W, HUD_H, LANE_W, BATTLE_H - HUD_H, COLORS.gold, 0.35)
+            .setOrigin(0, 0)
+            .setDepth(4);
+          this.scene.tweens.add({
+            targets: flash,
+            alpha: 0,
+            duration: 300,
+            onComplete: () => flash.destroy(),
+          });
+          break;
+        }
         case "breach": {
           const flash = this.scene.add
             .rectangle(
@@ -189,6 +246,7 @@ export class BattleView {
     this.enemies.clear();
     this.typeMemo.clear();
     this.clearLaneHints();
+    this.hideAbility();
     void this.baseLine;
   }
 }

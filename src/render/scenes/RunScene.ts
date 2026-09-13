@@ -3,6 +3,7 @@ import { CONTENT, ui } from "../../content/index.ts";
 import { Run } from "../../sim/Run.ts";
 import { TICKS_PER_SECOND } from "../../sim/modifiers.ts";
 import { BATTLE_H, COLORS, VIEW_W } from "../layout.ts";
+import { VOLLEY_COOLDOWN } from "../../sim/combat/WaveSim.ts";
 import { previewWave } from "../../sim/combat/waves.ts";
 import { aggregate } from "../../sim/stats/aggregate.ts";
 import { StatsAccumulator } from "../../sim/stats/RunStats.ts";
@@ -83,6 +84,15 @@ export class RunScene extends Phaser.Scene {
     this.meter.clear();
     this.live = new StatsAccumulator(this.run.waveNumber);
     this.acc = 0;
+    this.battle.setLaneTapHandler((lane) => {
+      const before = this.run.lastWaveEvents.length;
+      if (!this.run.useAbility(lane)) return;
+      const events = this.run.lastWaveEvents.slice(before);
+      this.battle.play(events.map((e) => e.ev));
+      this.live?.pushAll(events);
+      this.battle.sync(this.run.waveSim?.snapshot());
+      this.hud.sync();
+    });
   }
 
   override update(_time: number, delta: number): void {
@@ -102,12 +112,19 @@ export class RunScene extends Phaser.Scene {
         this.meter.showLive(this.live.stats);
         this.meter.showBoss(snap);
       }
+      this.battle.showAbility(
+        this.run.abilityCooldown,
+        VOLLEY_COOLDOWN,
+        ui(CONTENT, "volleyReady"),
+      );
       if (this.run.phase !== "wave") this.onWaveOver();
     }
   }
 
   private onWaveOver(): void {
     this.battle.sync(undefined);
+    this.battle.hideAbility();
+    this.battle.setLaneTapHandler(undefined);
     this.meter.clear();
     this.live = undefined;
     const stats = this.run.waveStats.at(-1);

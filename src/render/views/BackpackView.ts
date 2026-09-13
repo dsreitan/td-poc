@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { CONTENT, itemText } from "../../content/index.ts";
-import type { Run } from "../../sim/Run.ts";
+import type { DragSource, Run } from "../../sim/Run.ts";
 import type { PlacedItem } from "../../sim/grid/Backpack.ts";
 import { footprint, nextOrientation, type Cell, type Orientation } from "../../sim/grid/shapes.ts";
 import { itemDef } from "../../sim/items/defs.ts";
@@ -136,7 +136,10 @@ export class BackpackView {
       this.hooks.onHover(undefined, false);
       const cur = this.views.get(item.id)?.item;
       if (!cur) return;
-      if (inBench(pointer.x, pointer.y)) {
+      const target = this.combineTargetAt(pointer, { from: "grid", itemId: item.id });
+      if (target) {
+        this.run.combine({ from: "grid", itemId: item.id }, target);
+      } else if (inBench(pointer.x, pointer.y)) {
         this.run.toBench(item.id);
       } else if (inSellZone(pointer.x, pointer.y)) {
         this.run.sell(item.id);
@@ -214,6 +217,20 @@ export class BackpackView {
       this.hooks.onHover(undefined, false);
       return;
     }
+    const src: DragSource = shapeDefId
+      ? (this.externalSource ?? { from: "bench" })
+      : { from: "grid", itemId: ignoreId! };
+    const target = this.combineTargetAt(pointer, src);
+    if (target) {
+      const pv = this.run.previewCombine(src, target)!;
+      this.ghost.fillStyle(pv.kind === "merge" ? COLORS.ok : COLORS.gold, 0.55);
+      for (const c of this.run.backpack.cellsOf(target)) {
+        const { x, y } = cellToXY(c.col, c.row);
+        this.ghost.fillRect(x + 2, y + 2, CELL - 4, CELL - 4);
+      }
+      this.hooks.onHover(this.run.backpack.coverage(target), false);
+      return;
+    }
     const shape = shapeDefId ? itemDef(shapeDefId).shape : this.run.backpack.get(ignoreId!)!.shape;
     const cells = footprint(shape, orientation, anchor);
     const res = this.run.backpack.canPlace(shape, orientation, anchor, ignoreId);
@@ -229,12 +246,31 @@ export class BackpackView {
 
   // ---- external drags (from the shop) share the ghost path
 
-  externalPreview(pointer: Phaser.Input.Pointer, defId: string, orientation: Orientation): void {
+  private externalSource: DragSource | undefined;
+
+  externalPreview(
+    pointer: Phaser.Input.Pointer,
+    defId: string,
+    orientation: Orientation,
+    src: DragSource,
+  ): void {
+    this.externalSource = src;
     this.previewAt(pointer, undefined, orientation, { col: 0, row: 0 }, defId);
+  }
+
+  /** Grid item under the pointer that `src` could merge into or craft with. */
+  combineTargetAt(pointer: Phaser.Input.Pointer, src: DragSource): string | undefined {
+    const cell = xyToCell(pointer.x, pointer.y);
+    if (!cell) return undefined;
+    const hit = this.run.backpack.itemAt(cell);
+    if (!hit) return undefined;
+    if (src.from === "grid" && src.itemId === hit.id) return undefined;
+    return this.run.previewCombine(src, hit.id) ? hit.id : undefined;
   }
 
   externalDrop(): void {
     this.ghost.clear();
+    this.externalSource = undefined;
     this.hooks.onHover(undefined, false);
   }
 

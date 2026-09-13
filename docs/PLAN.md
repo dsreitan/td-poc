@@ -632,6 +632,13 @@ holds.
 
 ## 4. Milestones
 
+Status (2026-09-13): M0–M4 and M6 are on `main` and deployed to
+https://dsreitan.github.io/td-poc/. M5's content (all items, adjacency
+buffs, defensive breach rule, Lodestone reach) landed inside M2 and M4, so
+M5 is closed. M7 (save/resume, tuning pass, polish) is next; the M3 gate
+questions (feel, taps between runs, speed-toggle use) need human testers on
+the deployed build.
+
 Each milestone ends in a runnable state and a commit. Estimates are rough
 working-day counts for one developer.
 

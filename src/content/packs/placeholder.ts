@@ -93,5 +93,6 @@ export const PLACEHOLDER_PACK: ContentPack = {
     shielded: "shielded",
     runOver: "Run over",
     wavesCleared: "waves cleared",
+    volleyReady: "VOLLEY ready · tap a lane",
   },
 };

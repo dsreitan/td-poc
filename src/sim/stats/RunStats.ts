@@ -41,6 +41,7 @@ export interface WaveStats {
   enemiesSpawned: number;
   enemiesKilled: number;
   totalGold: number;
+  abilitiesUsed: number;
   sources: Record<string, SourceStats>;
   lanes: LaneStats[];
 }
@@ -78,6 +79,7 @@ export class StatsAccumulator {
       enemiesSpawned: 0,
       enemiesKilled: 0,
       totalGold: 0,
+      abilitiesUsed: 0,
       sources: {},
       lanes: Array.from({ length: LANES }, () => ({
         spawned: 0,
@@ -168,6 +170,9 @@ export class StatsAccumulator {
         }
         break;
       }
+      case "abilityUsed":
+        st.abilitiesUsed++;
+        break;
       case "waveEnded":
         st.result = ev.result;
         st.baseHpEnd = ev.baseHp;

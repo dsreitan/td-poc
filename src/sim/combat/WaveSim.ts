@@ -20,6 +20,9 @@ import { LANES } from "./constants.ts";
 import { enemyDef, switchedLane, type EnemyDef } from "./enemies.ts";
 import { expandSpawns, type WaveDef } from "./waves.ts";
 
+/** Ticks between Volley uses (15 s). */
+export const VOLLEY_COOLDOWN = 300;
+
 interface StatusState {
   ticks: number;
   magnitude: number;
@@ -105,6 +108,7 @@ export class WaveSim {
   private readonly defenses = new Map<string, DefenseState>();
   private readonly startEvents: SimEvent[] = [];
   private result: WaveResult | undefined;
+  private _volleyCooldown = 0;
 
   constructor(opts: WaveSimOptions) {
     this.bp = opts.backpack;
@@ -172,6 +176,11 @@ export class WaveSim {
 
   get rng(): Rng {
     return this._rng;
+  }
+
+  /** Ticks until Volley is ready again. */
+  get volleyCooldown(): number {
+    return this._volleyCooldown;
   }
 
   snapshot(): WaveSnapshot {
@@ -281,6 +290,7 @@ export class WaveSim {
   }
 
   private tickStatuses(out: SimEvent[]): void {
+    if (this._volleyCooldown > 0) this._volleyCooldown--;
     for (const e of this.enemies) {
       if (e.immuneTicks > 0) e.immuneTicks--;
       if (e.burn) {
@@ -360,6 +370,33 @@ export class WaveSim {
     if (this.result) {
       out.push({ t: "waveEnded", result: this.result, ticks: this.t + 1, baseHp: this.baseHp });
     }
+  }
+
+  /**
+   * Volley (hero ability): every weapon covering `lane` fires immediately at
+   * +50% damage, ignoring its cooldown (which is then reset). One use per
+   * VOLLEY_COOLDOWN ticks. Returns the events, empty if unavailable.
+   */
+  useVolley(lane: number): SimEvent[] {
+    const out: SimEvent[] = [];
+    if (this.result !== undefined || this._volleyCooldown > 0 || lane < 0 || lane >= LANES)
+      return out;
+    this._volleyCooldown = VOLLEY_COOLDOWN;
+    out.push({ t: "abilityUsed", lane });
+    for (const w of this.weapons) {
+      if (!w.columns.includes(lane)) continue;
+      const target = this.frontmost([lane]);
+      if (!target) continue;
+      w.cooldown = w.cooldownTicks;
+      out.push({ t: "weaponFired", itemId: w.item.id, targetId: target.id, lane });
+      const boosted: WeaponState = {
+        ...w,
+        stats: { ...w.stats, damage: Math.floor((w.stats.damage * 150) / 100) },
+      };
+      this.hit(target, boosted, { kind: "item", itemId: w.item.id, via: "shot" }, out);
+    }
+    this.reap(out);
+    return out;
   }
 
   /** Fire boss phases whose trigger is met. One phase per enemy per tick. */
