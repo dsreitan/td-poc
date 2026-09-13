@@ -58,7 +58,20 @@ implement flow in the POC, but make the simulation model *ready* for it:
 
 If the gate passes, the first post-POC experiment is "heat": cannons generate
 heat, adjacent frost flasks vent it, overheated cannons stall. That is a real
-flow mechanic and it already uses two of the twelve items.
+flow mechanic and it already uses two of the twelve items. The concrete
+readiness work is in §3.7.
+
+### 1.4 The one rule that keeps everything extensible
+
+**Everything enters the simulation as data and leaves as events.** Item,
+enemy, boss, status and wave definitions are tables. Meta-progression (if we
+ever add it) enters through a single `RunModifiers` object. Every effect the
+sim produces is an event with a `source` attribution. Nothing else crosses
+the boundary.
+
+That rule is what makes the later ideas (stats screens, factory flow, hero
+XP, an RPG layer, PvP replays) additive instead of rewrites, and it costs
+nothing now.
 
 ---
 
@@ -162,7 +175,7 @@ takes B's position and shape if it fits, otherwise the craft is refused.
 | Frost flask + Cannon | **Glacier mortar** (1×2) | Cannon splash applies 50% slow |
 | Ammunition pouch + Ballista | **Siege engine** (1×2) | Ballista pierces the whole column, +50% dmg |
 
-### 2.7 Enemies (4 + boss)
+### 2.7 Enemies (4 + 2 bosses)
 
 | Enemy | HP | Speed (units/tick) | Armor | Breach dmg | Notes |
 |---|---|---|---|---|---|
@@ -170,25 +183,52 @@ takes B's position and shape if it fits, otherwise the craft is refused.
 | Runner | 5 | 22 | 0 | 1 | punishes slow weapons |
 | Armored | 20 | 7 | 3 (flat reduction per hit) | 2 | punishes low-damage spam; magic ignores armor |
 | Swarmling | 3 | 14 | 0 | 1 | spawns in groups of 5–8; rewards splash |
-| **Bulwark** (boss, wave 10) | 150 | 5 | 5 | 8 | switches lane once at position 500; wave preview shows both lanes |
+| **Warden** (mini-boss, wave 5) | 60 | 6 | 2 | 4 | shield phase at 50% HP, see §2.8 |
+| **Bulwark** (boss, wave 10) | 150 | 5 | 5 | 8 | lane switch + charge strip, see §2.8 |
 
-### 2.8 Waves
+### 2.8 Boss levels
+
+Bosses are the waves that *test a specific property of the layout* rather than
+just scaling numbers. Each boss has a stated question and the preview makes
+that question legible before the wave.
+
+| Wave | Boss | Tests | Mechanic (data-driven phases) |
+|---|---|---|---|
+| 5 | **Warden** (mini-boss) | Burst vs sustained damage | 60 HP, armor 2. At 50% HP gains a shield: immune for 60 ticks, then armor drops to 0. Rewards weapons that hold fire or slows that buy time. |
+| 10 | **Bulwark** | Lane coverage and defensive depth | 150 HP, armor 5. Switches lane once at position 500 (preview shows both lanes). Every breach it survives strips one charge from *every* defensive item in that column. |
+
+Boss rules for the POC:
+
+- Bosses come with an **escort** drawn from the normal enemy table, so single-
+  target builds cannot ignore the escort and swarm builds cannot ignore the
+  boss.
+- Boss waves pay a **fixed bonus** on clear and unlock nothing (no permanent
+  upgrades in the POC).
+- A boss has `phases: BossPhase[]`, each `{ trigger: 'hpBelow' | 'position' |
+  'tick', value, effects[] }`. Phase effects reuse the status/buff system, so a
+  boss phase is just data that applies statuses to itself or to items.
+- Boss HP bar and phase markers are rendered from `bossPhaseEntered` events.
+
+Post-POC (see §6.5): a boss pool with 4–6 bosses and a random pick per run, plus
+boss modifiers ("hasted", "shielded escort") for endless mode.
+
+### 2.9 Waves
 
 Waves are data: a list of `{ tick, lane, enemyType, count, spacingTicks }`.
 The preview shown in the shop is derived from the same data (per-lane counts
 by enemy type), so preview and reality cannot disagree.
 
-Wave 1–3: grunts, then runners. Wave 4 introduces armored. Wave 6 swarmlings.
-Wave 7–9 mix, with a deliberate lane skew each wave so the player has a reason
-to move things. Wave 10: boss + escort.
+Wave 1–3: grunts, then runners. Wave 4 introduces armored. Wave 5: Warden.
+Wave 6 swarmlings. Wave 7–9 mix, with a deliberate lane skew each wave so the
+player has a reason to move things. Wave 10: Bulwark + escort.
 
-### 2.9 Hero ability (one)
+### 2.10 Hero ability (one)
 
 **Volley:** tap a lane; every weapon covering that lane fires immediately with
 +50% damage. Cooldown 300 ticks (15 s). Lane-targeted so it is still a spatial
 decision, and it teaches coverage.
 
-### 2.10 Save
+### 2.11 Save
 
 Save the *shop state* between waves only (never mid-wave): run seed, wave
 index, gold, base HP, grid contents, bench, shop offers, reroll count. One
@@ -220,7 +260,10 @@ src/
       waves.ts              # WaveDef table + preview(waveDef)
     economy/
       Shop.ts               # offers, reroll, buy, sell
-    Run.ts                  # state machine Shop ↔ Wave, win/lose, save DTO
+    stats/
+      RunStats.ts           # fold(events) → WaveStats; live + post-wave meter
+      aggregate.ts          # WaveStats[] → RunStats
+    Run.ts                  # state machine Shop ↔ Wave, win/lose, save DTO, RunModifiers input
   render/                   # Phaser 3. Consumes SimEvents, never mutates sim.
     Game.ts                 # Phaser.Game config, 360×800 FIT
     scenes/
@@ -230,7 +273,8 @@ src/
       BattleView.ts         # lanes, enemies, projectiles, base HP
       BackpackView.ts       # grid, drag/drop, rotate, merge/craft drop feedback
       ShopView.ts           # offers, reroll, sell, wave preview, start button
-      HudView.ts            # gold, wave, speed toggle, ability button
+      HudView.ts            # gold, wave, speed toggle, ability button, top-damage meter
+      StatsView.ts          # post-wave / post-run stats from RunStats
     placeholder.ts          # coloured rects + text labels for everything
   save/
     localStorage.ts
@@ -254,18 +298,35 @@ tests/
 The sim exposes `tick(): SimEvent[]`. Renderer plays them. Sketch:
 
 ```ts
+/** Who caused an effect. Every damage/status/gold event carries one. */
+type Source =
+  | { kind: 'item'; itemId: string; via?: 'shot' | 'splash' | 'burn' | 'pierce' | 'retaliation' }
+  | { kind: 'ability'; ability: 'volley' }
+  | { kind: 'boss'; bossId: number; phase: number }
+  | { kind: 'wave' };                                        // clear bonus etc.
+
 type SimEvent =
+  | { t: 'waveStarted'; wave: number; tick: 0 }
+  | { t: 'buffApplied'; itemId: string; byItemId: string; buff: BuffKind; amount: number }  // at wave start, from the adjacency graph
   | { t: 'enemySpawned'; id: number; type: EnemyType; lane: number }
   | { t: 'enemyMoved'; id: number; pos: number }             // once per tick per enemy
   | { t: 'weaponFired'; itemId: string; targetId: number; lane: number }
-  | { t: 'enemyDamaged'; id: number; amount: number; hp: number; source: string }
-  | { t: 'enemyKilled'; id: number; gold: number }
-  | { t: 'statusApplied'; id: number; status: 'slow' | 'burn'; ticks: number }
+  | { t: 'enemyDamaged'; id: number; amount: number; hp: number; source: Source; overkill: number }
+  | { t: 'enemyKilled'; id: number; source: Source }
+  | { t: 'statusApplied'; id: number; status: StatusKind; ticks: number; source: Source }
+  | { t: 'statusExpired'; id: number; status: StatusKind }
+  | { t: 'goldEarned'; amount: number; source: Source }
   | { t: 'breach'; id: number; lane: number; absorbedBy?: string; baseDamage: number }
   | { t: 'itemChargeUsed'; itemId: string; remaining: number }
   | { t: 'abilityUsed'; lane: number }
+  | { t: 'bossPhaseEntered'; bossId: number; phase: number }
+  | { t: 'itemXpGained'; itemId: string; amount: number; source: Source }   // reserved, §6.1
+  | { t: 'resourceTransferred'; from: string; to: string; resource: ResourceKind; amount: number } // reserved, §3.7
   | { t: 'waveEnded'; result: 'cleared' | 'baseDestroyed'; ticks: number }
 ```
+
+Every tick's events are tagged with the tick number by the caller, so stats
+can compute uptimes and timelines without the sim knowing about stats.
 
 `enemyMoved` per tick is chatty but simple; if it becomes a problem the
 renderer can read positions from a read-only snapshot instead. Decide at M3
@@ -278,8 +339,9 @@ based on profiling, not in advance.
 - Entities stored in arrays, iterated in id order. No `Set`/`Map` iteration
   for anything that affects outcome.
 - All arithmetic on integers. Percent buffs applied as `Math.floor(x * n / 100)`.
-- Replay test: fixed seed + fixed build → hash of all events must match a
-  committed golden value. Update the golden deliberately when rules change.
+- Replay test: fixed seed + fixed build + default `RunModifiers` → hash of all
+  events must match a committed golden value. Update the golden deliberately
+  when rules change.
 
 ### 3.5 Toolchain: Vite+
 
@@ -327,6 +389,77 @@ in 0.3.1):
   tools are all standard: `npx vitest`, `npx oxlint`, `npx vite` work on the
   same config. Fall back, note it in the commit, move on.
 
+### 3.6 Stats and telemetry (Backpack Battles-style)
+
+The post-wave and post-run stats screens are a **pure fold over the event
+stream**. No counters inside the combat sim, no second source of truth.
+
+```
+src/sim/stats/
+  RunStats.ts      # reduce(events: TaggedEvent[]): WaveStats
+  aggregate.ts     # WaveStats[] → RunStats
+```
+
+`WaveStats` per item (and per ability, per boss):
+
+| Stat | Derived from |
+|---|---|
+| Damage dealt, split by `via` (shot / splash / burn / pierce / retaliation) | `enemyDamaged.source` |
+| Kills, overkill wasted | `enemyKilled`, `enemyDamaged.overkill` |
+| Shots fired, hit rate | `weaponFired`, `enemyDamaged` |
+| Buffs **granted** (for supports): which items, which buff, how much | `buffApplied.byItemId` |
+| Buffs **received** (for weapons) | `buffApplied.itemId` |
+| Debuffs applied, total slow-ticks / burn-ticks inflicted | `statusApplied`, `statusExpired` |
+| Blocks absorbed, retaliation damage | `breach.absorbedBy`, `itemChargeUsed` |
+| Gold earned by source (kills, wave, coin purse) | `goldEarned` |
+| Base damage taken per lane | `breach.baseDamage` |
+| Lane pressure: enemies per lane, breaches per lane | `enemySpawned`, `breach` |
+
+Design consequences that come for free:
+
+- **Top damage meter** in the HUD during the wave: the same reducer runs
+  incrementally on each tick's events. One code path for live and post-wave.
+- **Credit for supports.** A frost flask does no damage, but its row shows
+  "slowed 14 enemies for 420 ticks, buffed Crossbow ×2". That is what makes
+  support items feel worth their cell.
+- **Completeness pressure.** If a mechanic does not show up in stats, it is
+  because the sim forgot to emit an event for it. The stats test suite is
+  therefore also a test that the event stream is complete.
+- **Balance harness output.** `sim:bench` prints `RunStats` aggregates across
+  seeds: average damage share per item, which lanes breach most, which items
+  are never bought. This is the tuning loop.
+
+Post-run screen: damage share bar per item, best wave, gold curve, and the
+final build. Persist `RunStats` summaries to local storage for a run history
+list (cheap, and it is the seed of any later profile/RPG layer).
+
+### 3.7 Factory-flow readiness (no flow in the POC)
+
+What we build now so that resource flow is additive later:
+
+- `ItemDef.ports?: { provides?: ResourceKind[]; consumes?: ResourceKind[] }`.
+  POC: ammunition pouch `provides: ['ammo']`, projectile weapons
+  `consumes: ['ammo']`. `ResourceKind = 'ammo' | 'heat' | 'mana'` with only
+  `ammo` referenced anywhere.
+- `Backpack.adjacencyGraph()` returns `{ nodes: itemId[], edges: [a, b][] }`.
+  Computed once at wave start (the backpack is locked during a wave), cached
+  on the `WaveSim`. Buffs are derived from this graph, emitted as
+  `buffApplied` events, and stored on the weapon for the wave.
+- Buff computation lives in one function: `deriveBuffs(graph, items) →
+  Map<itemId, Buff[]>`. Flow later becomes a second pass over the same graph
+  (`deriveFlow(graph, items) → transfers[]`) that emits `resourceTransferred`.
+- The `resourceTransferred` event exists in the union now so stats and the
+  renderer have a slot for it. Nothing emits it in the POC.
+- `ItemDef.effects` are expressed as a list of typed effect records (`{ kind:
+  'buffAdjacent', buff, amount }`, `{ kind: 'statusOnHit', status, ticks }`),
+  not as bespoke code per item. Adding a `{ kind: 'produceResource' }` record
+  later is a new case, not a new system.
+
+Explicitly **not** doing now: any per-tick resource accounting, any UI for
+flow, any "connected" vs "adjacent" distinction. If the gate passes and the
+first flow experiment ("heat", §1.3) proves out, connection topology becomes
+a real question and gets its own design pass.
+
 ---
 
 ## 4. Milestones
@@ -359,6 +492,8 @@ working-day counts for one developer.
   damage, kills, breach against base HP.
 - Crossbow and Cannon fully working. Grunt and Runner.
 - Wave defs + `preview()`.
+- `Source` attribution on every damage/kill/gold event; `stats/RunStats.ts`
+  reducer with tests (damage per item, kills, gold by source).
 - Headless test: given build X and wave 1, the wave clears in N ticks with
   base HP Y. Replay hash test.
 - `sim:bench` task skeleton, runnable with `vp run sim:bench`.
@@ -382,13 +517,21 @@ working-day counts for one developer.
 
 - Shop with reroll, sell, bench slot. Gold from kills, clears, coin purse.
 - All 10 waves, win/lose screens, restart.
-- Armored, Swarmling, Bulwark boss with lane switch.
-- Wave preview panel in the shop, per lane.
+- Armored, Swarmling. Boss phase system as data; Warden (wave 5) and Bulwark
+  (wave 10) with escorts; boss HP bar with phase markers.
+- Wave preview panel in the shop, per lane, including boss lane path.
+- Post-wave stats panel (damage meter, buffs granted/received, blocks) and
+  post-run summary, both rendered from `RunStats`. Live top-damage meter in
+  the HUD.
 
 ### M5 — All items and adjacency effects (2 d)
 
 - Remaining weapons, all supports and buff computation from the adjacency
-  graph, defensive items and the breach rule, Lodestone coverage extension.
+  graph (`deriveBuffs`, `buffApplied` events), defensive items and the breach
+  rule, Lodestone coverage extension. `ItemDef.ports` populated for the
+  ammunition pouch and projectile weapons.
+- Stats extended with support credit (buffs granted, slow/burn ticks
+  inflicted) and block stats.
 - Tests for each support's effect on a neighbouring weapon, breach absorption
   order, slow non-stacking.
 
@@ -401,14 +544,16 @@ working-day counts for one developer.
 
 ### M7 — Save, tuning, polish (2 d)
 
-- Save/resume in shop. Versioned DTO.
+- Save/resume in shop. Versioned DTO. Run history (last 20 `RunStats`
+  summaries) in a separate storage key.
 - Run `sim:bench` across a handful of reference builds; tune wave defs so a
   naive build loses around wave 6–7 and a thoughtful one clears wave 10 with
-  base HP to spare.
+  base HP to spare. Use the stats aggregates to find dead items.
 - Minimal feedback: hit flashes, damage numbers, breach shake. Still no art.
 
-Total: roughly 14–15 working days to a complete, tunable POC, with a
-go/no-go decision at day 7.
+Total: roughly 15–16 working days to a complete, tunable POC, with a
+go/no-go decision at day 7. The stats layer adds about a day across M2/M4/M5;
+the boss phase system about half a day in M4.
 
 ---
 
@@ -427,7 +572,101 @@ go/no-go decision at day 7.
 
 ---
 
-## 6. Immediate next step
+## 6. Post-POC roadmap: ideas and what they need from the POC
+
+None of these are built in the POC. Each entry says what the POC must leave
+in place so the idea is additive.
+
+### 6.1 Hero towers that earn XP
+
+An item class that levels up through use instead of through merging. Gains
+XP per kill or per damage dealt, levels at thresholds, each level improving a
+stat or unlocking a trait. Gives the run a second progression axis and gives
+early-game items a reason to stay in the bag.
+
+Ready when: `itemXpGained` event exists (it does), `ItemDef` has an optional
+`xpCurve?: number[]` and `levelEffects?: Effect[][]`, item instances carry
+`xp` and `level` (defaulting to 0, ignored by non-hero items), and the save
+DTO stores them. Design question for later: can a hero item also merge, or
+are XP and merge exclusive? Recommendation: exclusive, so the two axes stay
+readable.
+
+### 6.2 Economy towers and items
+
+Coin purse is the only economy item in the POC. The natural family:
+
+| Item | Effect | What it tests |
+|---|---|---|
+| Coin purse | flat gold per wave | space vs. income |
+| Vault (1×2) | interest: +10% of held gold per wave, capped | banking vs. spending |
+| Market stall | reroll cost −1 while in bag | shop-heavy strategies |
+| Tollgate (defensive + economy) | gold per breach absorbed | turning damage taken into income |
+| Scrapper | selling adjacent items refunds 100% | flexible rebuilding |
+
+Ready when: `goldEarned.source` attribution (exists), shop parameters
+(reroll cost, sell ratio) are read from a `ShopModifiers` object the bag can
+influence rather than constants, and interest is computed in `Run`, not in
+the wave sim.
+
+### 6.3 Debuffs
+
+Slow and burn ship in the POC via a generic status system: `StatusKind`,
+`StatusDef { stacking: 'refresh' | 'stack' | 'strongest'; tickEffect?;
+onApply?; onExpire? }`. The family to add later:
+
+- **Armor break**: −N armor for M ticks. Counterplay to Armored and bosses.
+- **Weaken**: enemy deals less breach damage.
+- **Mark**: next hit from any source deals +X%. Rewards weapon sequencing.
+- **Root**: speed 0 for a very short time. Enables "hold at the line" builds.
+- **Chill stacks → Freeze**: a stacking status that converts at a threshold.
+  Needs `stacking: 'stack'` and a conversion rule, which is why the status
+  def carries a stacking policy from day one.
+
+Ready when: statuses are data (`StatusDef` table), applied through one code
+path, and stats already count them per source.
+
+### 6.4 RPG mode between matches
+
+A persistent hero with talents, unlocked items, and a campaign map where each
+node is a run or a boss. This is the meta-progression the original pitch
+deliberately excluded from the POC ("no permanent upgrades"), and it should
+stay excluded until the core loop is proven, because it can mask a weak core.
+
+Ready when:
+
+- The sim takes a single `RunModifiers` input (starting gold, base HP,
+  unlocked item pool, global buffs, boss pool). Meta-progression only ever
+  writes to that object. Replays then remain deterministic from
+  `(seed, modifiers, decisions)`.
+- Saves are split: `RunSave` (current run, exists in POC) and `ProfileSave`
+  (persistent, empty in POC). Run history from §3.6 already lives on the
+  profile side.
+- Stats are per-run and aggregable, so campaign nodes can set objectives
+  ("clear wave 10 taking ≤5 base damage", "win with no cannons") checked
+  against `RunStats`.
+
+Open design question to settle before starting: does the RPG layer change
+the *item pool* (roguelike unlocks) or the *hero* (talents that buff the
+bag)? The first keeps runs varied; the second risks the power creep that
+makes early waves trivial. Recommendation: item pool first.
+
+### 6.5 Boss pool and endless mode
+
+Once two bosses exist as data, a pool of 4–6 with random selection at waves
+5 and 10, then an endless mode past wave 10 that cycles bosses with
+modifiers. Needs nothing beyond the phase system in §2.8 and a difficulty
+scaling function on wave defs.
+
+### 6.6 Asynchronous PvP
+
+Your bag versus another player's recorded wave pressure, or two bags racing
+the same seeded wave set. Needs: deterministic sim (POC), `RunStats` for
+scoring (POC), and a way to serialise a build (the save DTO, POC). No
+backend in the POC, but nothing in the POC blocks one.
+
+---
+
+## 7. Immediate next step
 
 Create the M0 scaffold and the M1 backpack simulation with tests. Nothing in
 M1 needs Phaser, so it can be reviewed entirely through the test suite before
