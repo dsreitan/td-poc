@@ -242,10 +242,12 @@ tests/
 
 ### 3.2 Boundary enforcement
 
-- ESLint `no-restricted-imports`: anything under `src/sim/**` may not import
-  `phaser` or anything from `src/render/**`.
+- Oxlint `no-restricted-imports` (ESLint-compatible rule), scoped with an
+  override to `src/sim/**`: may not import `phaser` or anything from
+  `src/render/**`.
 - A vitest test greps `src/sim` for the string `phaser` and fails if found.
-  Cheap and unambiguous.
+  Cheap, unambiguous, and independent of linter config drift while Vite+ is
+  pre-1.0.
 
 ### 3.3 Event stream
 
@@ -272,20 +274,58 @@ based on profiling, not in advance.
 ### 3.4 Determinism checklist
 
 - One PRNG instance per run, seeded from the run seed, passed explicitly.
-- `Math.random` banned by ESLint in `src/sim`.
+- `Math.random` banned in `src/sim` via Oxlint `no-restricted-properties`.
 - Entities stored in arrays, iterated in id order. No `Set`/`Map` iteration
   for anything that affects outcome.
 - All arithmetic on integers. Percent buffs applied as `Math.floor(x * n / 100)`.
 - Replay test: fixed seed + fixed build → hash of all events must match a
   committed golden value. Update the golden deliberately when rules change.
 
-### 3.5 Toolchain
+### 3.5 Toolchain: Vite+
 
-- Vite + TypeScript (strict), Phaser 3 (latest 3.x), Vitest.
-- ESLint + Prettier with the import restrictions above.
-- `npm run sim:bench` — headless script that runs N seeded runs with a given
+We use **Vite+** (`vite-plus`, the `vp` CLI from VoidZero) as the single
+toolchain instead of wiring Vite, Vitest, ESLint and Prettier separately.
+Status at time of writing: 0.3.1 is the `latest` tag on npm (2026-09-08),
+MIT-licensed, open source, still pre-1.0 beta.
+
+What we get from one dependency and one `vite.config.ts`:
+
+| Need | `vp` command | Underlying tool |
+|---|---|---|
+| Dev server, HMR | `vp dev` | Vite |
+| Production build | `vp build` | Vite + Rolldown |
+| Unit tests (sim rules) | `vp test` | Vitest |
+| Lint, incl. the sim/render boundary | `vp lint` | Oxlint |
+| Formatting | `vp fmt` | Oxfmt |
+| Type checking | `vp check` | tsgo / tsc |
+| Scripts, e.g. `sim:bench` | `vp run sim:bench` | Vite Task |
+| Node + package manager pinning | `vp env` | built in |
+| Pre-commit lint/format | `vp staged` + `vp hooks` | built in |
+
+Other decisions:
+
+- TypeScript strict. Phaser 3 latest 3.x.
+- `vp run sim:bench` — headless script that runs N seeded runs with a given
   build and prints wave clear rates. This is the balance tool.
 - Capacitor deferred until after the gate; nothing in the plan blocks it.
+  Capacitor only needs the `dist/` output of `vp build`.
+
+Pre-1.0 precautions (Vite+ has shipped renames and layout changes between
+0.x minors, e.g. `VP_*` env vars in 0.2.8, `vp env setup` replacing corepack
+in 0.3.1):
+
+- Pin `vite-plus` to an exact version in `package.json`; bump deliberately,
+  in its own commit, reading the release notes.
+- Commit the `vp env` Node/package-manager pin so every machine and CI use
+  the same runtime.
+- Keep everything in one `vite.config.ts`; do not add standalone
+  `vitest.config.ts` / `.oxlintrc.json` unless `vp migrate` or a release
+  note requires it.
+- Keep the grep-based boundary test (§3.2) so the architectural rule does
+  not depend on linter configuration surviving an upgrade.
+- If `vp` blocks us on something for more than an hour, the underlying
+  tools are all standard: `npx vitest`, `npx oxlint`, `npx vite` work on the
+  same config. Fall back, note it in the commit, move on.
 
 ---
 
@@ -296,10 +336,13 @@ working-day counts for one developer.
 
 ### M0 — Scaffold (0.5 d)
 
-- Vite + TS + Phaser + Vitest + ESLint wired. `npm run dev` shows a 360×800
+- `npm create vite-plus` (vanilla TypeScript template), add Phaser 3, pin
+  `vite-plus` exactly, `vp env` pin for Node. `vp dev` shows a 360×800
   letterboxed canvas with the two-panel split and a "hello" rect in each.
-- CI: lint, typecheck, test.
-- `src/sim` boundary rule in place, with the grep test.
+- Single `vite.config.ts` carrying test, lint and fmt config.
+- CI runs `vp lint`, `vp check`, `vp test`, `vp build`.
+- `src/sim` boundary rule in place in Oxlint, plus the grep test.
+- `vp hooks` installs a pre-commit `vp staged` so lint/format never reach CI.
 
 ### M1 — Backpack simulation (1.5 d)
 
@@ -318,7 +361,7 @@ working-day counts for one developer.
 - Wave defs + `preview()`.
 - Headless test: given build X and wave 1, the wave clears in N ticks with
   base HP Y. Replay hash test.
-- `sim:bench` script skeleton.
+- `sim:bench` task skeleton, runnable with `vp run sim:bench`.
 
 ### M3 — Phaser prototype: **the gate** (3 d)
 
