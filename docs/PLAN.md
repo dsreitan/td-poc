@@ -378,8 +378,9 @@ in 0.3.1):
 
 - Pin `vite-plus` to an exact version in `package.json`; bump deliberately,
   in its own commit, reading the release notes.
-- Commit the `vp env` Node/package-manager pin so every machine and CI use
-  the same runtime.
+- Pin Node through `devEngines.runtime` in `package.json` (what `vp env`
+  reads; the local `vp` binary does not carry `vp env`, only the global
+  installer does). CI uses the same major through `setup-vp`.
 - Keep everything in one `vite.config.ts`; do not add standalone
   `vitest.config.ts` / `.oxlintrc.json` unless `vp migrate` or a release
   note requires it.
@@ -422,11 +423,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm }
-      - run: npm ci
-      - run: npx vp lint && npx vp check && npx vp test
-      - run: npx vp build
+      - uses: voidzero-dev/setup-vp@v1.20.0   # exact version; v1 tag is frozen
+        with: { node-version: "22", cache: true }
+      - run: vp install
+      - run: vp check && vp test
+      - run: vp build
         env: { VITE_BASE: /td-poc/ }
       - uses: actions/upload-pages-artifact@v3
         with: { path: dist }
@@ -452,9 +453,9 @@ Notes:
 - Phaser has no server requirements. Save data is `localStorage`, which is
   per-origin, so a Pages deploy and a local dev server keep separate saves.
   Convenient for testing.
-- `vp env` pins Node for developers; CI uses `setup-node` with the same
-  major so both match. If `vp` needs its own install step in CI, the release
-  notes say so and the fallback is `npx vite build`, same config.
+- `devEngines.runtime` pins Node for developers; CI installs Vite+ with the
+  official `setup-vp` action, pinned to an exact release as its docs require.
+  Fallback if the action misbehaves: `setup-node` + `npm ci` + `npx vp build`.
 - Add to home screen on Android gives a full-screen portrait test build
   without Capacitor. A minimal `manifest.webmanifest` (display: standalone,
   orientation: portrait) is a five-minute M0 addition and worth it.
@@ -545,9 +546,9 @@ working-day counts for one developer.
 
 ### M0 — Scaffold (0.5 d)
 
-- `npm create vite-plus` (vanilla TypeScript template), add Phaser 3, pin
-  `vite-plus` exactly, `vp env` pin for Node. `vp dev` shows a 360×800
-  letterboxed canvas with the two-panel split and a "hello" rect in each.
+- `vp create vite -- --template vanilla-ts`, add Phaser 3.90, pin
+  `vite-plus` exactly, Node pinned via `devEngines`. `vp dev` shows a 360×800
+  letterboxed canvas with the two-panel split, four lanes and the 4×5 grid.
 - Single `vite.config.ts` carrying test, lint and fmt config.
 - CI runs `vp lint`, `vp check`, `vp test`, `vp build` on pull requests;
   the same plus deploy to GitHub Pages on push to `main` (§3.6). First
@@ -555,7 +556,9 @@ working-day counts for one developer.
   anything to test.
 - `manifest.webmanifest` for add-to-home-screen portrait testing on Android.
 - `src/sim` boundary rule in place in Oxlint, plus the grep test.
-- `vp hooks` installs a pre-commit `vp staged` so lint/format never reach CI.
+- `prepare` runs `vp config`, which installs the hook dispatcher; the
+  committed `.vite-hooks/pre-commit` runs `vp staged` (= `vp check --fix` on
+  staged files) so lint/format problems never reach CI.
 
 ### M1 — Backpack simulation (1.5 d)
 

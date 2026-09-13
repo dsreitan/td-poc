@@ -1,0 +1,39 @@
+{
+  "name": "backpack-bastion",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Backpack Bastion: a portrait tower-defense prototype where the inventory grid is the tower formation.",
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "preview": "vp preview",
+    "test": "vp test",
+    "lint": "vp lint",
+    "fmt": "vp fmt",
+    "check": "vp check",
+    "prepare": "vp config --no-agent"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "phaser": "3.90.0",
+    "typescript": "~6.0.2",
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.1",
+    "vite-plus": "0.3.1"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.1"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": ">=10.9.0",
+      "onFail": "warn"
+    },
+    "runtime": {
+      "name": "node",
+      "version": "^22.18.0",
+      "onFail": "download"
+    }
+  }
+}
