@@ -17,6 +17,8 @@ import {
 } from "../layout.ts";
 
 export interface DragHooks {
+  /** Long-press on a grid item. */
+  onInfo(defId: string, tier: 1 | 2 | 3): void;
   /** Called while dragging with the lanes the item would cover at the hovered anchor. */
   onHover(lanes: readonly number[] | undefined, sellHover: boolean): void;
   onChanged(): void;
@@ -111,8 +113,23 @@ export class BackpackView {
     let dragging = false;
     let grab: Cell = { col: 0, row: 0 };
     let orientation: Orientation = item.orientation;
+    // Hold ~450 ms without moving: show details instead of rotating.
+    let holdTimer: Phaser.Time.TimerEvent | undefined;
+    let held = false;
+    root.on("pointerdown", () => {
+      held = false;
+      holdTimer?.remove(false);
+      holdTimer = this.scene.time.delayedCall(450, () => {
+        if (dragging) return;
+        held = true;
+        const cur = this.views.get(item.id)?.item;
+        if (cur) this.hooks.onInfo(cur.defId, cur.tier);
+      });
+    });
+    root.on("pointerout", () => holdTimer?.remove(false));
     root.on("dragstart", (pointer: Phaser.Input.Pointer) => {
       if (this.locked) return;
+      holdTimer?.remove(false);
       dragging = true;
       orientation = this.views.get(item.id)!.item.orientation;
       const cell = xyToCell(pointer.x, pointer.y);
@@ -152,7 +169,8 @@ export class BackpackView {
       this.hooks.onChanged();
     });
     root.on("pointerup", () => {
-      if (dragging || this.locked) return;
+      holdTimer?.remove(false);
+      if (dragging || this.locked || held) return;
       // A tap without a drag rotates in place.
       this.run.rotate(item.id);
       this.sync();

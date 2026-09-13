@@ -11,13 +11,14 @@ import {
   type KeyValueStore,
 } from "../../save/storage.ts";
 import { TICKS_PER_SECOND } from "../../sim/modifiers.ts";
-import { BATTLE_H, COLORS, VIEW_W } from "../layout.ts";
+import { BATTLE_H, COLORS, METER_Y, VIEW_W } from "../layout.ts";
 import { previewWave } from "../../sim/combat/waves.ts";
 import { aggregate } from "../../sim/stats/aggregate.ts";
 import { StatsAccumulator } from "../../sim/stats/RunStats.ts";
 import { BackpackView } from "../views/BackpackView.ts";
 import { BattleView } from "../views/BattleView.ts";
 import { HudView } from "../views/HudView.ts";
+import { InfoView } from "../views/InfoView.ts";
 import { MeterView } from "../views/MeterView.ts";
 import { PreviewView } from "../views/PreviewView.ts";
 import { ShopView } from "../views/ShopView.ts";
@@ -33,6 +34,8 @@ export class RunScene extends Phaser.Scene {
   private hud!: HudView;
   private preview!: PreviewView;
   private meter!: MeterView;
+  private info!: InfoView;
+  private hint: Phaser.GameObjects.Text | undefined;
   private live: StatsAccumulator | undefined;
   private readonly store: KeyValueStore = browserStore();
   private acc = 0;
@@ -63,6 +66,7 @@ export class RunScene extends Phaser.Scene {
 
     this.battle = new BattleView(this, this.run.backpack);
     this.bag = new BackpackView(this, this.run, {
+      onInfo: (defId, tier) => this.showInfo(defId, tier),
       onHover: (lanes, sellHover) => {
         if (lanes) this.battle.showLaneHints(lanes);
         else this.battle.clearLaneHints();
@@ -76,10 +80,15 @@ export class RunScene extends Phaser.Scene {
       this.bag,
       () => this.refresh(),
       () => this.startWave(),
+      (defId, tier) => this.showInfo(defId, tier),
     );
     this.hud = new HudView(this, this.run, () => this.newRun());
     this.preview = new PreviewView(this);
     this.meter = new MeterView(this, this.run.backpack);
+    this.info = new InfoView(this, () => {
+      this.registry.set("info", undefined);
+      this.showShopOverlays();
+    });
     this.refresh();
     this.showShopOverlays();
   }
@@ -89,9 +98,34 @@ export class RunScene extends Phaser.Scene {
     const wave = this.run.currentWave;
     this.preview.show(wave ? previewWave(wave) : undefined);
     this.meter.showSummary(this.run.waveStats.at(-1));
+    this.hint?.destroy();
+    this.hint = undefined;
+    if (this.run.waveStats.length === 0 && this.run.backpack.count === 0) {
+      this.hint = this.add
+        .text(VIEW_W / 2, METER_Y + 30, ui(CONTENT, "hintFirstRun"), {
+          fontFamily: "monospace",
+          fontSize: "11px",
+          color: COLORS.muted,
+          align: "center",
+          wordWrap: { width: VIEW_W - 40 },
+        })
+        .setOrigin(0.5, 0)
+        .setDepth(2);
+    }
+  }
+
+  private showInfo(defId: string, tier: 1 | 2 | 3): void {
+    if (this.run.phase !== "shop") return;
+    this.preview.hide();
+    this.meter.clear();
+    this.hint?.destroy();
+    this.hint = undefined;
+    this.info.show(defId, tier);
+    this.registry.set("info", defId);
   }
 
   private refresh(): void {
+    this.info.hide();
     this.bag.sync();
     this.shop.sync();
     this.hud.sync();
@@ -121,6 +155,7 @@ export class RunScene extends Phaser.Scene {
 
   private startWave(): void {
     if (!this.run.startWave()) return;
+    this.info.hide();
     this.battle.reset();
     this.bag.setLocked(true);
     this.shop.setLocked(true);

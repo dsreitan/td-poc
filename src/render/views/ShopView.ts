@@ -55,13 +55,17 @@ export class ShopView {
   private readonly startText: Phaser.GameObjects.Text;
   private locked = false;
 
+  private readonly onInfo: (defId: string, tier: 1 | 2 | 3) => void;
+
   constructor(
     scene: Phaser.Scene,
     run: Run,
     backpackView: BackpackView,
     onChanged: () => void,
     onStart: () => void,
+    onInfo: (defId: string, tier: 1 | 2 | 3) => void,
   ) {
+    this.onInfo = onInfo;
     this.scene = scene;
     this.run = run;
     this.backpackView = backpackView;
@@ -203,6 +207,11 @@ export class ShopView {
         source(),
       );
     });
+    root.on("pointerup", () => {
+      if (dragging) return;
+      const defId = root.getData("defId") as string | undefined;
+      if (defId) this.onInfo(defId, (root.getData("tier") as 1 | 2 | 3 | undefined) ?? 1);
+    });
     root.on("dragend", (pointer: Phaser.Input.Pointer) => {
       if (!dragging) return;
       dragging = false;
@@ -275,8 +284,10 @@ export class ShopView {
     defId: string | undefined,
     costText: string,
     affordable: boolean,
+    tier: 1 | 2 | 3 = 1,
   ): void {
     card.root.setData("defId", defId);
+    card.root.setData("tier", tier);
     if (!defId) {
       card.root.setVisible(false);
       return;
@@ -300,7 +311,13 @@ export class ShopView {
       );
     });
     const b = this.run.bench;
-    this.paint(this.bench, b?.defId, b && b.tier > 1 ? "★".repeat(b.tier - 1) : "", true);
+    this.paint(
+      this.bench,
+      b?.defId,
+      b && b.tier > 1 ? "★".repeat(b.tier - 1) : "",
+      true,
+      b?.tier ?? 1,
+    );
     this.benchBg.setStrokeStyle(1, b ? COLORS.gold : COLORS.gridLine);
     const canReroll = !this.locked && this.run.rerollCost <= this.run.gold;
     this.rerollText
