@@ -632,12 +632,23 @@ holds.
 
 ## 4. Milestones
 
-Status (2026-09-13): M0–M4 and M6 are on `main` and deployed to
+Status (2026-09-13): M0–M4, M6 and most of M7 are on `main` and deployed to
 https://dsreitan.github.io/td-poc/. M5's content (all items, adjacency
 buffs, defensive breach rule, Lodestone reach) landed inside M2 and M4, so
-M5 is closed. M7 (save/resume, tuning pass, polish) is next; the M3 gate
-questions (feel, taps between runs, speed-toggle use) need human testers on
-the deployed build.
+M5 is closed. M7 done: save/resume between waves, run history, `?seed=`,
+a first tuning pass. M7 open: visual polish (damage numbers), a second
+tuning pass, and the M3 gate questions (feel, taps between runs,
+speed-toggle use), which need human testers on the deployed build.
+
+**Numbers.** The item and enemy tables in §2.5 and §2.7 are the original
+design values. The tuned values live in `src/sim/items/defs.ts`,
+`src/sim/combat/enemies.ts`, `src/sim/combat/waves.ts` and
+`src/sim/modifiers.ts`; `vp run sim:bench` prints the current curve. After
+tuning round 1 the static targets sit where §4/M7 asked: an empty bag dies
+on wave 2, four front-row crossbows die on wave 7, a full tier-2 bag wins
+with 7 base HP. The greedy autopilot buyer (`src/sim/autopilot.ts`) wins
+38% of seeds but is bimodal, with a cliff at wave 3; whether that is the
+bot or the wave is the first question for tuning round 2.
 
 Each milestone ends in a runnable state and a commit. Estimates are rough
 working-day counts for one developer.

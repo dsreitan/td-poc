@@ -34,13 +34,13 @@ export interface EnemyDef {
 }
 
 export const ENEMY_DEFS: readonly EnemyDef[] = [
-  { id: "grunt", hp: 10, speed: 10, armor: 0, breachDamage: 1, gold: 1 },
-  { id: "runner", hp: 5, speed: 22, armor: 0, breachDamage: 1, gold: 1 },
-  { id: "armored", hp: 20, speed: 7, armor: 3, breachDamage: 2, gold: 2 },
+  { id: "grunt", hp: 8, speed: 10, armor: 0, breachDamage: 1, gold: 1 },
+  { id: "runner", hp: 4, speed: 22, armor: 0, breachDamage: 1, gold: 1 },
+  { id: "armored", hp: 18, speed: 7, armor: 3, breachDamage: 2, gold: 2 },
   { id: "swarmling", hp: 3, speed: 14, armor: 0, breachDamage: 1, gold: 1 },
   {
     id: "warden",
-    hp: 60,
+    hp: 70,
     speed: 6,
     armor: 2,
     breachDamage: 4,
@@ -59,7 +59,7 @@ export const ENEMY_DEFS: readonly EnemyDef[] = [
   },
   {
     id: "bulwark",
-    hp: 150,
+    hp: 160,
     speed: 5,
     armor: 5,
     breachDamage: 8,

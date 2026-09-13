@@ -48,10 +48,21 @@ describe("stats reducer", () => {
     expect(st.sources["item:ff"]!.buffsGranted).toEqual([
       { to: "cn", buff: "slowOnHit", amount: 30 },
     ]);
-    expect(st.sources["item:ff"]!.statusesApplied.slow.count).toBeGreaterThan(0);
-    expect(st.sources["item:ff"]!.statusesApplied.slow.ticks).toBe(
-      st.sources["item:ff"]!.statusesApplied.slow.count * 30,
-    );
+    // Statuses land only on survivors, so use enemies the cannon cannot one-shot.
+
+    const tough = runWave({
+      backpack: bp(),
+
+      wave: wave([{ tick: 0, lane: 1, enemy: "armored", count: 3, spacingTicks: 30 }]),
+
+      rng: new Rng(1),
+    });
+
+    const ff = reduceWave(tough.events).sources["item:ff"]!;
+
+    expect(ff.statusesApplied.slow.count).toBeGreaterThan(0);
+
+    expect(ff.statusesApplied.slow.ticks).toBe(ff.statusesApplied.slow.count * 30);
     expect(st.sources["item:ff"]!.totalDamage).toBe(0);
   });
 

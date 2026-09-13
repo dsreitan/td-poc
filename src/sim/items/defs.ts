@@ -35,7 +35,7 @@ export const ITEM_DEFS: readonly ItemDef[] = [
     rarity: "common",
     cost: 3,
     ports: { consumes: ["ammo"] },
-    tiers: weaponTiers({ damage: 3, cooldownTicks: 15 }, dmgScale),
+    tiers: weaponTiers({ damage: 4, cooldownTicks: 12 }, dmgScale),
   },
   {
     id: "cannon",
@@ -44,7 +44,7 @@ export const ITEM_DEFS: readonly ItemDef[] = [
     rarity: "uncommon",
     cost: 6,
     ports: { consumes: ["ammo"] },
-    tiers: weaponTiers({ damage: 8, cooldownTicks: 50, splashRange: 60 }, dmgScale),
+    tiers: weaponTiers({ damage: 10, cooldownTicks: 45, splashRange: 80 }, dmgScale),
   },
   {
     id: "flame_lance",
@@ -52,7 +52,7 @@ export const ITEM_DEFS: readonly ItemDef[] = [
     itemClass: "magicWeapon",
     rarity: "uncommon",
     cost: 5,
-    tiers: weaponTiers({ damage: 1, cooldownTicks: 5, ignoresArmor: true }, dmgScale),
+    tiers: weaponTiers({ damage: 1, cooldownTicks: 4, ignoresArmor: true }, dmgScale),
   },
   {
     id: "ballista",
@@ -61,7 +61,7 @@ export const ITEM_DEFS: readonly ItemDef[] = [
     rarity: "rare",
     cost: 7,
     ports: { consumes: ["ammo"] },
-    tiers: weaponTiers({ damage: 12, cooldownTicks: 70, pierce: 3 }, dmgScale),
+    tiers: weaponTiers({ damage: 14, cooldownTicks: 60, pierce: 3 }, dmgScale),
   },
   // ------------------------------------------------------------ supports
   {
@@ -199,7 +199,7 @@ export const ITEM_DEFS: readonly ItemDef[] = [
     cost: 8,
     craftedOnly: true,
     ports: { consumes: ["ammo"] },
-    tiers: weaponTiers({ damage: 3, cooldownTicks: 10 }, dmgScale, [
+    tiers: weaponTiers({ damage: 4, cooldownTicks: 8 }, dmgScale, [
       { kind: "statusOnHit", status: "burn", ticks: 20, magnitude: 1 },
     ]),
   },
@@ -211,7 +211,7 @@ export const ITEM_DEFS: readonly ItemDef[] = [
     cost: 10,
     craftedOnly: true,
     ports: { consumes: ["ammo"] },
-    tiers: weaponTiers({ damage: 8, cooldownTicks: 50, splashRange: 60 }, dmgScale, [
+    tiers: weaponTiers({ damage: 10, cooldownTicks: 45, splashRange: 80 }, dmgScale, [
       { kind: "statusOnHit", status: "slow", ticks: 30, magnitude: 50 },
     ]),
   },
@@ -223,7 +223,7 @@ export const ITEM_DEFS: readonly ItemDef[] = [
     cost: 11,
     craftedOnly: true,
     ports: { consumes: ["ammo"] },
-    tiers: weaponTiers({ damage: 18, cooldownTicks: 70, pierce: 99 }, dmgScale),
+    tiers: weaponTiers({ damage: 20, cooldownTicks: 60, pierce: 99 }, dmgScale),
   },
 ];
 

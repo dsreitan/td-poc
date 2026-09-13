@@ -79,7 +79,7 @@ describe("WaveSim: movement and breach", () => {
 });
 
 describe("WaveSim: weapons", () => {
-  it("a crossbow kills a grunt in four shots and is credited", () => {
+  it("a crossbow kills a grunt in two shots and is credited", () => {
     const run = runWave({
       backpack: build([["crossbow", { col: 0, row: 0 }, 0, 1, "xb"]]),
       wave: wave([{ tick: 0, lane: 0, enemy: "grunt", count: 1, spacingTicks: 1 }], 99, 5),
@@ -87,10 +87,10 @@ describe("WaveSim: weapons", () => {
     });
     expect(run.result).toBe("cleared");
     expect(run.baseHp).toBe(20);
-    expect(evs(run.events, "weaponFired")).toHaveLength(4); // 3 dmg x 4 >= 10 hp
+    expect(evs(run.events, "weaponFired")).toHaveLength(2); // 4 dmg x 2 >= 8 hp
     const dmg = evs(run.events, "enemyDamaged");
-    expect(dmg.map((d) => d.hp)).toEqual([7, 4, 1, 0]);
-    expect(dmg.at(-1)!.overkill).toBe(2);
+    expect(dmg.map((d) => d.hp)).toEqual([4, 0]);
+    expect(dmg.at(-1)!.overkill).toBe(0);
     expect(evs(run.events, "enemyKilled")[0]!.source).toEqual({
       kind: "item",
       itemId: "xb",
@@ -189,7 +189,7 @@ describe("WaveSim: weapons", () => {
       wave: wave([{ tick: 0, lane: 0, enemy: "armored", count: 1, spacingTicks: 1 }]),
       rng: new Rng(1),
     });
-    expect(evs(xb.events, "enemyDamaged")[0]!.amount).toBe(1); // 3 - 3 armor -> min 1
+    expect(evs(xb.events, "enemyDamaged")[0]!.amount).toBe(1); // 4 - 3 armor
     const fl = runWave({
       backpack: build([["flame_lance", { col: 0, row: 0 }]]),
       wave: wave([{ tick: 0, lane: 0, enemy: "armored", count: 1, spacingTicks: 1 }]),
@@ -227,7 +227,7 @@ describe("WaveSim: supports and statuses", () => {
     expect(first.filter((e) => e.t === "buffApplied")).toEqual([
       { t: "buffApplied", itemId: "xb", byItemId: "gb", buff: "attackSpeedPct", amount: 25 },
     ]);
-    expect(sim.snapshot().weapons[0]!.cooldownTicks).toBe(12); // floor(15*100/125)
+    expect(sim.snapshot().weapons[0]!.cooldownTicks).toBe(9); // floor(12*100/125)
   });
 
   it("ammunition pouch adds flat damage to projectile weapons only", () => {
@@ -249,7 +249,7 @@ describe("WaveSim: supports and statuses", () => {
     const xbHit = evs(run.events, "enemyDamaged").find(
       (d) => d.source.kind === "item" && d.source.itemId === "crossbow#1",
     );
-    expect(xbHit!.amount).toBe(5); // 3 + 2
+    expect(xbHit!.amount).toBe(6); // 4 + 2
   });
 
   it("frost flask slows enemies hit by the adjacent weapon; slow is credited to the flask", () => {

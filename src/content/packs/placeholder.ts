@@ -94,5 +94,7 @@ export const PLACEHOLDER_PACK: ContentPack = {
     runOver: "Run over",
     wavesCleared: "waves cleared",
     volleyReady: "VOLLEY ready · tap a lane",
+    newRun: "new",
+    confirm: "sure?",
   },
 };

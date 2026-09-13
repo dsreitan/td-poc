@@ -10,7 +10,7 @@ describe("Run", () => {
   it("starts in the shop with starting gold, base HP and four offers", () => {
     const run = new Run({ seed: 1 });
     expect(run.phase).toBe("shop");
-    expect(run.gold).toBe(10);
+    expect(run.gold).toBe(run.modifiers.startingGold);
     expect(run.baseHp).toBe(20);
     expect(run.waveNumber).toBe(1);
     expect(run.offers).toHaveLength(SHOP_SIZE);
@@ -30,7 +30,7 @@ describe("Run", () => {
     const offer = run.offers[0]!;
     const res = run.buy(0, { col: 0, row: 0 });
     expect(res).toEqual({ ok: true });
-    expect(run.gold).toBe(10 - offer.cost);
+    expect(run.gold).toBe(run.modifiers.startingGold - offer.cost);
     expect(run.offers[0]).toBeNull();
     expect(run.backpack.count).toBe(1);
     expect(run.backpack.all()[0]!.defId).toBe(offer.defId);
@@ -49,7 +49,7 @@ describe("Run", () => {
     const r = cheapSeedRun.buy(0, { col: 0, row: 9 });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toBe("outOfBounds");
-    expect(cheapSeedRun.gold).toBe(10);
+    expect(cheapSeedRun.gold).toBe(cheapSeedRun.modifiers.startingGold);
     expect(cheapSeedRun.offers[0]).not.toBeNull();
   });
 

@@ -10,8 +10,32 @@ export class HudView {
   speed = 1;
   private readonly run: Run;
 
-  constructor(scene: Phaser.Scene, run: Run) {
+  constructor(scene: Phaser.Scene, run: Run, onNewRun: () => void) {
     this.run = run;
+    // Abandon the run: first tap asks, second tap within 2 s confirms.
+    const newBtn = scene.add
+      .text(VIEW_W - 52, HUD_H / 2, ui(CONTENT, "newRun"), {
+        fontFamily: "monospace",
+        fontSize: "11px",
+        color: COLORS.muted,
+        backgroundColor: "#2c3140",
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(1, 0.5)
+      .setInteractive({ useHandCursor: true });
+    let armed = false;
+    newBtn.on("pointerup", () => {
+      if (armed) {
+        onNewRun();
+        return;
+      }
+      armed = true;
+      newBtn.setText(ui(CONTENT, "confirm")).setColor("#ffc857");
+      scene.time.delayedCall(2000, () => {
+        armed = false;
+        if (newBtn.active) newBtn.setText(ui(CONTENT, "newRun")).setColor(COLORS.muted);
+      });
+    });
     scene.add.rectangle(0, 0, VIEW_W, HUD_H, COLORS.bg).setOrigin(0, 0);
     this.text = scene.add
       .text(8, HUD_H / 2, "", { fontFamily: "monospace", fontSize: "13px", color: COLORS.text })

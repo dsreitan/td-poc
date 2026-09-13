@@ -12,7 +12,7 @@ export interface RunModifiers {
 
 export const DEFAULT_MODIFIERS: RunModifiers = {
   baseHp: 20,
-  startingGold: 10,
+  startingGold: 12,
   rowDelayTicks: 3,
 };
 

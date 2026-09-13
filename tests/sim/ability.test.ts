@@ -32,9 +32,9 @@ describe("Volley", () => {
       SimEvent,
       { t: "enemyDamaged" }
     >[];
-    // crossbow 3*1.5=4 -3 armor = 1 ; cannon 8*1.5=12 -3 = 9
-    expect(dmg.map((d) => d.amount).sort((a, b) => a - b)).toEqual([1, 9]);
-    expect(sim.snapshot().enemies[0]!.hp).toBe(hpBefore - 10);
+    // crossbow 4*1.5=6 -3 armor = 3 ; cannon 10*1.5=15 -3 = 12
+    expect(dmg.map((d) => d.amount).sort((a, b) => a - b)).toEqual([3, 12]);
+    expect(sim.snapshot().enemies[0]!.hp).toBe(hpBefore - 15);
     expect(sim.volleyCooldown).toBe(VOLLEY_COOLDOWN);
     expect(sim.useVolley(0)).toEqual([]); // on cooldown
     sim.step();

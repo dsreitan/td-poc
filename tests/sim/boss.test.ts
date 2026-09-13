@@ -27,18 +27,18 @@ describe("boss phases", () => {
       tick: number;
       ev: Extract<SimEvent, { t: "enemyDamaged" }>;
     }[];
-    // Crossbow tier 3 deals 9. Before the phase armor 2 applies: 7.
+    // Crossbow tier 3 deals 12. Before the phase armor 2 applies: 10.
     const before = dmg.filter((d) => d.tick < phaseTick);
     expect(before.length).toBeGreaterThan(0);
-    expect(before.every((d) => d.ev.amount === 7)).toBe(true);
+    expect(before.every((d) => d.ev.amount === 10)).toBe(true);
     // During the 60-tick shield every hit lands for 0.
     const during = dmg.filter((d) => d.tick > phaseTick && d.tick <= phaseTick + 60);
     expect(during.length).toBeGreaterThan(0);
     expect(during.every((d) => d.ev.amount === 0)).toBe(true);
-    // Afterwards armor is 0: full 9.
+    // Afterwards armor is 0: full 12.
     const after = dmg.filter((d) => d.tick > phaseTick + 60);
     expect(after.length).toBeGreaterThan(0);
-    expect(after[0]!.ev.amount).toBe(9);
+    expect(after[0]!.ev.amount).toBe(12);
     expect(evs(run.events, "enemyKilled")).toHaveLength(1);
     expect(run.baseHp).toBe(20);
   });

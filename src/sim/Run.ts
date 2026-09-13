@@ -6,7 +6,7 @@
 import { WaveSim } from "./combat/WaveSim.ts";
 import { WAVES, type WaveDef } from "./combat/waves.ts";
 import type { SimEvent, TaggedEvent } from "./events.ts";
-import { Backpack, type PlacementResult } from "./grid/Backpack.ts";
+import { Backpack, type PlacedItem, type PlacementResult } from "./grid/Backpack.ts";
 import type { Cell, Orientation } from "./grid/shapes.ts";
 import { itemDef, SHOP_ITEM_DEFS } from "./items/defs.ts";
 import { canMerge, mergedTier } from "./items/merge.ts";
@@ -62,6 +62,23 @@ export type DragSource =
 export const SHOP_SIZE = 4;
 export const REROLL_BASE_COST = 2;
 
+/** Versioned, JSON-safe snapshot of a run between waves. Never saved mid-wave. */
+export interface RunSave {
+  readonly v: 1;
+  readonly seed: number;
+  readonly rngState: number;
+  readonly modifiers: RunModifiers;
+  readonly waveIndex: number;
+  readonly gold: number;
+  readonly baseHp: number;
+  readonly items: readonly PlacedItem[];
+  readonly bench: BenchItem | null;
+  readonly offers: readonly (ShopOffer | null)[];
+  readonly rerolls: number;
+  readonly nextItemId: number;
+  readonly waveStats: readonly WaveStats[];
+}
+
 /** An owned item that is not in the grid. */
 export interface BenchItem {
   readonly id: string;
@@ -73,6 +90,8 @@ export interface RunOptions {
   readonly seed: number;
   readonly modifiers?: RunModifiers;
   readonly waves?: readonly WaveDef[];
+  /** Restore from a save instead of starting fresh. */
+  readonly restore?: RunSave;
 }
 
 export class Run {
@@ -98,10 +117,61 @@ export class Run {
     this.seed = opts.seed;
     this.modifiers = opts.modifiers ?? DEFAULT_MODIFIERS;
     this.waves = opts.waves ?? WAVES;
+    const r = opts.restore;
+    if (r) {
+      if (r.v !== 1) throw new Error(`Unsupported save version ${String(r.v)}`);
+      this.rng = Rng.fromState(r.rngState);
+      this._gold = r.gold;
+      this._baseHp = r.baseHp;
+      this._waveIndex = r.waveIndex;
+      this._offers = [...r.offers];
+      this._bench = r.bench;
+      this._rerolls = r.rerolls;
+      this.nextItemId = r.nextItemId;
+      this.waveStats.push(...r.waveStats);
+      for (const it of r.items) {
+        const placed = this.backpack.place(
+          { id: it.id, defId: it.defId, tier: it.tier, shape: it.shape },
+          it.anchor,
+          it.orientation,
+        );
+        if (!placed.ok) throw new Error(`Corrupt save: cannot place ${it.id} (${placed.reason})`);
+      }
+      return;
+    }
     this.rng = new Rng(opts.seed);
     this._gold = this.modifiers.startingGold;
     this._baseHp = this.modifiers.baseHp;
     this.rollOffers();
+  }
+
+  /** Snapshot for saving. Only valid in the shop phase (the wave sim is not serialised). */
+  toSave(): RunSave | undefined {
+    if (this._phase !== "shop") return undefined;
+    return {
+      v: 1,
+      seed: this.seed,
+      rngState: this.rng.getState(),
+      modifiers: this.modifiers,
+      waveIndex: this._waveIndex,
+      gold: this._gold,
+      baseHp: this._baseHp,
+      items: this.backpack.all(),
+      bench: this._bench,
+      offers: [...this._offers],
+      rerolls: this._rerolls,
+      nextItemId: this.nextItemId,
+      waveStats: [...this.waveStats],
+    };
+  }
+
+  static restore(save: RunSave, waves?: readonly WaveDef[]): Run {
+    return new Run({
+      seed: save.seed,
+      modifiers: save.modifiers,
+      restore: save,
+      ...(waves ? { waves } : {}),
+    });
   }
 
   // ------------------------------------------------------------ getters

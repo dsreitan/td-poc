@@ -101,12 +101,11 @@ export const WAVES: readonly WaveDef[] = [
     id: 2,
     clearBonus: 6,
     spawns: [
-      { tick: 0, lane: 0, enemy: "grunt", count: 3, spacingTicks: 35 },
-      { tick: 0, lane: 3, enemy: "grunt", count: 3, spacingTicks: 35 },
-      { tick: 60, lane: 1, enemy: "grunt", count: 2, spacingTicks: 40 },
-      { tick: 60, lane: 2, enemy: "grunt", count: 2, spacingTicks: 40 },
-      { tick: 200, lane: 1, enemy: "runner", count: 2, spacingTicks: 30 },
-      { tick: 200, lane: 2, enemy: "runner", count: 2, spacingTicks: 30 },
+      { tick: 0, lane: 0, enemy: "grunt", count: 3, spacingTicks: 45 },
+      { tick: 0, lane: 3, enemy: "grunt", count: 3, spacingTicks: 45 },
+      { tick: 80, lane: 1, enemy: "grunt", count: 2, spacingTicks: 40 },
+      { tick: 80, lane: 2, enemy: "grunt", count: 2, spacingTicks: 40 },
+      { tick: 220, lane: 1, enemy: "runner", count: 2, spacingTicks: 30 },
     ],
   },
   {
@@ -114,12 +113,12 @@ export const WAVES: readonly WaveDef[] = [
     clearBonus: 7,
     // Skew: lanes 2 and 3 carry the runners.
     spawns: [
-      { tick: 0, lane: 0, enemy: "grunt", count: 3, spacingTicks: 30 },
-      { tick: 0, lane: 1, enemy: "grunt", count: 3, spacingTicks: 30 },
-      { tick: 40, lane: 2, enemy: "grunt", count: 3, spacingTicks: 30 },
-      { tick: 40, lane: 3, enemy: "grunt", count: 3, spacingTicks: 30 },
-      { tick: 160, lane: 2, enemy: "runner", count: 3, spacingTicks: 25 },
-      { tick: 180, lane: 3, enemy: "runner", count: 3, spacingTicks: 25 },
+      { tick: 0, lane: 0, enemy: "grunt", count: 3, spacingTicks: 40 },
+      { tick: 0, lane: 1, enemy: "grunt", count: 2, spacingTicks: 40 },
+      { tick: 40, lane: 2, enemy: "grunt", count: 3, spacingTicks: 40 },
+      { tick: 40, lane: 3, enemy: "grunt", count: 3, spacingTicks: 40 },
+      { tick: 180, lane: 2, enemy: "runner", count: 3, spacingTicks: 30 },
+      { tick: 200, lane: 3, enemy: "runner", count: 3, spacingTicks: 30 },
     ],
   },
   {

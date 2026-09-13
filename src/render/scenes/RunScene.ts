@@ -1,6 +1,15 @@
 import Phaser from "phaser";
 import { CONTENT, ui } from "../../content/index.ts";
 import { Run } from "../../sim/Run.ts";
+import {
+  browserStore,
+  clearRun,
+  historyEntry,
+  loadRun,
+  recordRun,
+  saveRun,
+  type KeyValueStore,
+} from "../../save/storage.ts";
 import { TICKS_PER_SECOND } from "../../sim/modifiers.ts";
 import { BATTLE_H, COLORS, VIEW_W } from "../layout.ts";
 import { VOLLEY_COOLDOWN } from "../../sim/combat/WaveSim.ts";
@@ -26,6 +35,7 @@ export class RunScene extends Phaser.Scene {
   private preview!: PreviewView;
   private meter!: MeterView;
   private live: StatsAccumulator | undefined;
+  private readonly store: KeyValueStore = browserStore();
   private acc = 0;
   private banner: Phaser.GameObjects.Container | undefined;
 
@@ -34,9 +44,21 @@ export class RunScene extends Phaser.Scene {
   }
 
   create(data?: { seed?: number }): void {
+    // Resume a saved run unless a seed was asked for explicitly (URL or Run again).
     const urlSeed = this.registry.get("seed") as number | undefined;
-    const seed = data?.seed ?? urlSeed ?? Date.now() % 1_000_000;
-    this.run = new Run({ seed });
+    const explicit = data?.seed ?? urlSeed;
+    const saved = explicit === undefined ? loadRun(this.store) : undefined;
+    if (saved) {
+      try {
+        this.run = Run.restore(saved);
+      } catch {
+        clearRun(this.store);
+        this.run = new Run({ seed: Date.now() % 1_000_000 });
+      }
+    } else {
+      this.run = new Run({ seed: explicit ?? Date.now() % 1_000_000 });
+    }
+    if (urlSeed !== undefined) this.registry.set("seed", undefined); // only the first run uses the URL seed
     this.acc = 0;
 
     this.battle = new BattleView(this, this.run.backpack);
@@ -55,7 +77,7 @@ export class RunScene extends Phaser.Scene {
       () => this.refresh(),
       () => this.startWave(),
     );
-    this.hud = new HudView(this, this.run);
+    this.hud = new HudView(this, this.run, () => this.newRun());
     this.preview = new PreviewView(this);
     this.meter = new MeterView(this, this.run.backpack);
     this.refresh();
@@ -73,6 +95,28 @@ export class RunScene extends Phaser.Scene {
     this.bag.sync();
     this.shop.sync();
     this.hud.sync();
+    this.persist();
+  }
+
+  /** Save in the shop phase; nothing is ever saved mid-wave. */
+  private persist(): void {
+    const save = this.run.toSave();
+    if (save) saveRun(this.store, save);
+  }
+
+  private endRun(): void {
+    const result = this.run.phase === "won" ? "won" : "lost";
+    recordRun(
+      this.store,
+      historyEntry(this.run.seed, result, aggregate(this.run.waveStats), new Date()),
+    );
+    clearRun(this.store);
+  }
+
+  /** Abandon the current run and start a fresh one. */
+  newRun(): void {
+    clearRun(this.store);
+    this.scene.restart({ seed: (this.run.seed + 7919) % 1_000_000 });
   }
 
   private startWave(): void {
@@ -137,6 +181,7 @@ export class RunScene extends Phaser.Scene {
       this.showShopOverlays();
       return;
     }
+    this.endRun();
     const agg = aggregate(this.run.waveStats);
     const title = phase === "won" ? ui(CONTENT, "victory") : ui(CONTENT, "defeat");
     const sub = `${agg.wavesCleared}/${this.run.waveCount} ${ui(CONTENT, "wavesCleared")} · ${agg.enemiesKilled} ${ui(CONTENT, "kills")} · ${agg.totalGold}g`;
