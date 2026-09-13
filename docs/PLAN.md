@@ -73,6 +73,41 @@ That rule is what makes the later ideas (stats screens, factory flow, hero
 XP, an RPG layer, PvP replays) additive instead of rewrites, and it costs
 nothing now.
 
+### 1.5 Lessons from other games, turned into rules
+
+**Hearthstone: hard to come back to after a break.** The gap is *power*.
+Returning players face cards they do not own and cannot afford, so the first
+sessions back are losses with no path out. Rule for us:
+
+- A run is self-contained. Everything that decides a run's outcome is
+  available inside the run, from wave 1, for every player.
+- Meta-progression (if ever, §6.4) unlocks **variety, not power**: new items
+  join the shop pool, new bosses join the boss pool, new content packs.
+  Nothing a lapsed player lacks makes their bag weaker than a regular's.
+- No seasonal power rotation. If we ever rotate, we rotate the *pool*, and
+  everyone sees the same pool.
+- The skill that matters after a break is reading the wave preview and
+  placing well. That skill does not decay and does not need a purchase.
+
+**Backpack Brawl: too much clicking between matches.** Chests, tabs, claim
+buttons and reveal animations are cheap dopamine and they cost the player's
+time and attention. Rule for us:
+
+- The loop is: shop → wave → shop. Between *runs* it is one tap: "Run again"
+  (same seed offered as a rematch, or a new seed). Nothing to open, claim or
+  collect.
+- No loot boxes, chests, daily claims or currency exchanges. Rewards, if any,
+  appear inline on the post-run stats screen and are already applied.
+- Every screen outside a run is reachable in one tap from the post-run
+  screen and returns to it in one tap. Budget: **two taps** from "run over"
+  to "wave 1 shop" of the next run.
+- The dopamine budget goes into the run: a merge landing, a cannon clearing a
+  swarm, the damage meter flipping. The stats screen (§3.7) is where the
+  "reveal" lives, and it is information, not a box.
+
+These are checked at the M3 gate along with feel: count taps between runs
+and time spent outside the run.
+
 ---
 
 ## 2. Design decisions locked for the POC
@@ -276,6 +311,10 @@ src/
       HudView.ts            # gold, wave, speed toggle, ability button, top-damage meter
       StatsView.ts          # post-wave / post-run stats from RunStats
     placeholder.ts          # coloured rects + text labels for everything
+  content/                  # presentation: names, text, sprite keys (§3.9). No mechanics.
+    types.ts
+    packs/placeholder.ts
+    index.ts
   save/
     localStorage.ts
   main.ts
@@ -343,7 +382,27 @@ based on profiling, not in advance.
   events must match a committed golden value. Update the golden deliberately
   when rules change.
 
-### 3.5 Toolchain: Vite+
+### 3.5 Toolchain: Vite+ and a newest-stable policy
+
+**Policy: newest stable release of everything, pinned exactly.** No LTS
+lagging, no "wait for x.1". Pre-1.0 tools (Vite+) are allowed when their
+release cadence is healthy and a fallback exists. Concretely, at time of
+writing:
+
+| Layer | Choice | Why this and not the safer one |
+|---|---|---|
+| Engine | **Phaser 4.2** | New renderer, first-class TypeScript types, WebGL2 default. 3.x is maintenance-only. |
+| Language | **TypeScript 7.0** (Go compiler) | 10× faster type checks; Vite+ already type-checks through the Go toolchain (tsgolint), so the `typescript` package matches it. |
+| Runtime | **Node 24 LTS** in CI, `^22.18 \|\| ^24.11` accepted locally | 24 is current LTS. 22 accepted so this dev container works. |
+| Bundler / dev | Vite 8 + Rolldown via Vite+ | Rolldown is the default in Vite 8. |
+| Tests / lint / fmt | Vitest 4, Oxlint, Oxfmt via Vite+ | Rust tooling, one config. |
+| HTML / CSS | Plain, modern. `viewport-fit=cover`, `dvh` units, `env(safe-area-inset-*)`, container queries where a DOM overlay exists. No CSS framework: the game is one canvas plus a few overlays. | |
+| Mobile wrapper | Capacitor, latest major, post-gate | |
+
+Upgrade cadence: dependabot weekly for actions; a manual `npm outdated` pass
+at each milestone boundary, bumped in its own commit with release notes read.
+The replay-hash test (§3.4) is the tripwire for any upgrade that changes
+behaviour.
 
 We use **Vite+** (`vite-plus`, the `vp` CLI from VoidZero) as the single
 toolchain instead of wiring Vite, Vitest, ESLint and Prettier separately.
@@ -366,7 +425,7 @@ What we get from one dependency and one `vite.config.ts`:
 
 Other decisions:
 
-- TypeScript strict. Phaser 3 latest 3.x.
+- TypeScript strict (7.x). Phaser 4.x.
 - `vp run sim:bench` — headless script that runs N seeded runs with a given
   build and prints wave clear rates. This is the balance tool.
 - Capacitor deferred until after the gate; nothing in the plan blocks it.
@@ -537,6 +596,38 @@ flow, any "connected" vs "adjacent" distinction. If the gate passes and the
 first flow experiment ("heat", §1.3) proves out, connection topology becomes
 a real question and gets its own design pass.
 
+### 3.9 Content packs: reskin without touching the sim
+
+"Crossbow", "Grunt" and "Backpack Bastion" are working titles. The setting,
+story and object names will change. So presentation is a separate layer from
+day one:
+
+```
+src/sim/**          knows only stable ids: "crossbow", "grunt", "warden"
+src/content/
+  types.ts          ContentPack: items, enemies, ui strings, sprite keys
+  packs/placeholder.ts   the current working-title pack
+  index.ts          CONTENT = the active pack; itemText(), enemyText(), ui()
+src/render/**       reads CONTENT for every visible string and texture key
+```
+
+Rules:
+
+- The simulation and its tests never contain a display name or a sentence
+  of flavour text. `ItemDef` is mechanics only. A test enforces that every
+  sim id has content and no content is orphaned.
+- The renderer never hard-codes a string a player can read. It goes through
+  `ui(CONTENT, key)`.
+- Ids are stable forever, even after a reskin: `crossbow` may be displayed
+  as "Thornbow" or "Rail turret", the save files and replays keep working.
+- Art is addressed by `sprite` keys in the pack, so a reskin ships a new
+  atlas and a new pack, and the render code is untouched.
+- Story beats, boss intros and tutorial text (none in the POC) go in the
+  pack as well, keyed by wave or boss id.
+
+A second pack (even a joke one) in M7 is the cheap proof that the seam
+holds.
+
 ---
 
 ## 4. Milestones
@@ -546,7 +637,7 @@ working-day counts for one developer.
 
 ### M0 — Scaffold (0.5 d)
 
-- `vp create vite -- --template vanilla-ts`, add Phaser 3.90, pin
+- `vp create vite -- --template vanilla-ts`, add Phaser 4.2, pin
   `vite-plus` exactly, Node pinned via `devEngines`. `vp dev` shows a 360×800
   letterboxed canvas with the two-panel split, four lanes and the 4×5 grid.
 - Single `vite.config.ts` carrying test, lint and fmt config.
@@ -555,6 +646,8 @@ working-day counts for one developer.
   deploy is the "hello" canvas, so the pipeline is proven before there is
   anything to test.
 - `manifest.webmanifest` for add-to-home-screen portrait testing on Android.
+- `src/content` pack layer with the placeholder pack (§3.9); sim item table
+  stripped of display text.
 - `src/sim` boundary rule in place in Oxlint, plus the grep test.
 - `prepare` runs `vp config`, which installs the hook dispatcher; the
   committed `.vite-hooks/pre-commit` runs `vp staged` (= `vp check --fix` on
@@ -595,6 +688,8 @@ working-day counts for one developer.
   one column left because the preview shows runners there *feel* like a
   decision? Two or three people outside the team play three waves. If the
   answer is no, stop and rethink §2.3 before building anything else.
+- Also measured at the gate (§1.5): taps from "wave over" to "next shop",
+  and whether testers reach for the speed toggle.
 
 ### M4 — Full run loop and economy (2 d)
 
@@ -728,10 +823,20 @@ Ready when:
   ("clear wave 10 taking ≤5 base damage", "win with no cannons") checked
   against `RunStats`.
 
+Design constraints from §1.5, non-negotiable for this layer:
+
+- **Variety, not power.** Unlocks add to the shop pool, boss pool or
+  content packs. Nothing unlocked makes a run easier than a fresh account's.
+  A talent tree that buffs the bag is the Hearthstone problem and is out.
+- **Two taps** from post-run screen to next run's first shop. The campaign
+  map, if it exists, is a place to *choose* the next run, not a place to
+  collect things.
+- No chests, claims, daily rewards or currency exchange screens.
+
 Open design question to settle before starting: does the RPG layer change
-the *item pool* (roguelike unlocks) or the *hero* (talents that buff the
-bag)? The first keeps runs varied; the second risks the power creep that
-makes early waves trivial. Recommendation: item pool first.
+the *item pool* (roguelike unlocks) or the *hero* (a persistent character
+with a story)? Given the constraints above the hero can carry story and
+cosmetics but never stats. Recommendation: item pool first, story second.
 
 ### 6.5 Boss pool and endless mode
 

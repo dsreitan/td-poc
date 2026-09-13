@@ -1,0 +1,83 @@
+import type { ContentPack } from "../types.ts";
+
+/**
+ * Placeholder pack. Names are working titles that describe the mechanic;
+ * they are not the shipped fiction. Swap the whole pack to reskin.
+ */
+export const PLACEHOLDER_PACK: ContentPack = {
+  id: "placeholder",
+  title: "Backpack Bastion",
+  tagline: "The bag is the wall.",
+  items: {
+    crossbow: { name: "Crossbow", description: "Fires a bolt at the front enemy in its column." },
+    cannon: {
+      name: "Cannon",
+      description: "Slow shell with splash. Covers every column it occupies.",
+    },
+    flame_lance: {
+      name: "Flame lance",
+      description: "Continuous flame on the front enemy. Ignores armor.",
+    },
+    ballista: {
+      name: "Ballista",
+      description: "Heavy bolt that pierces up to three enemies in the column.",
+    },
+    frost_flask: {
+      name: "Frost flask",
+      description: "Adjacent weapons slow the enemies they hit.",
+    },
+    gearbox: { name: "Gearbox", description: "Adjacent weapons attack faster." },
+    ammo_pouch: {
+      name: "Ammunition pouch",
+      description: "Adjacent projectile weapons deal more damage.",
+    },
+    fire_rune: {
+      name: "Fire rune",
+      description: "Adjacent weapons set enemies on fire. Also a crafting reagent.",
+    },
+    lodestone: {
+      name: "Lodestone",
+      description: "Adjacent weapons can also target neighbouring lanes.",
+    },
+    spiked_shield: {
+      name: "Spiked shield",
+      description: "Blocks a breach in its column and damages the attacker.",
+    },
+    iron_wall: { name: "Iron wall", description: "Absorbs several breaches per wave." },
+    coin_purse: {
+      name: "Coin purse",
+      description: "Earns gold every wave. Takes up valuable space.",
+    },
+    flaming_repeater: {
+      name: "Flaming repeater",
+      description: "Fire rune + Crossbow. Rapid bolts that burn.",
+    },
+    glacier_mortar: {
+      name: "Glacier mortar",
+      description: "Frost flask + Cannon. Splash that slows.",
+    },
+    siege_engine: {
+      name: "Siege engine",
+      description: "Ammunition pouch + Ballista. Pierces the whole column.",
+    },
+  },
+  enemies: {
+    grunt: { name: "Grunt" },
+    runner: { name: "Runner" },
+    armored: { name: "Armored" },
+    swarmling: { name: "Swarmling" },
+    warden: { name: "Warden" },
+    bulwark: { name: "Bulwark" },
+  },
+  ui: {
+    startWave: "Start wave",
+    reroll: "Reroll",
+    sell: "Sell",
+    gold: "Gold",
+    wave: "Wave",
+    base: "Base",
+    nextWave: "Next wave",
+    victory: "Bastion holds",
+    defeat: "Bastion falls",
+  },
+};

@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { CONTENT } from "../../content/index.ts";
 import {
   BATTLE_H,
   BATTLE_Y,
@@ -56,7 +57,7 @@ export class BootScene extends Phaser.Scene {
 
     // Labels
     const style = { fontFamily: "monospace", fontSize: "14px", color: COLORS.muted };
-    this.add.text(8, 8, "BACKPACK BASTION · M0", { ...style, color: COLORS.text });
+    this.add.text(8, 8, `${CONTENT.title.toUpperCase()} · M0`, { ...style, color: COLORS.text });
     for (let i = 0; i < LANES; i++) {
       this.add.text(i * LANE_W + LANE_W / 2, BATTLE_Y + 40, `lane ${i}`, style).setOrigin(0.5, 0);
     }

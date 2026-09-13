@@ -78,8 +78,8 @@ export interface TierData {
 }
 
 export interface ItemDef {
+  /** Stable internal key. Content packs map it to a display name and art. */
   readonly id: string;
-  readonly name: string;
   readonly shape: Shape;
   readonly itemClass: ItemClass;
   readonly rarity: Rarity;
@@ -90,7 +90,6 @@ export interface ItemDef {
   readonly tiers: readonly [TierData, TierData, TierData];
   /** True for items that only exist as recipe results (never in the shop). */
   readonly craftedOnly?: boolean;
-  readonly description: string;
 }
 
 export function tierData(def: ItemDef, tier: Tier): TierData {

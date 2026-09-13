@@ -51,7 +51,7 @@ describe("item definitions", () => {
   });
 
   it("looks up by id and throws on unknown", () => {
-    expect(itemDef("crossbow").name).toBe("Crossbow");
+    expect(itemDef("crossbow").itemClass).toBe("projectileWeapon");
     expect(hasItemDef("nope")).toBe(false);
     expect(() => itemDef("nope")).toThrow(/Unknown item def/);
   });
