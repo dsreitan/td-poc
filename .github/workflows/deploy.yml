@@ -14,12 +14,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      # Creates the Pages site (source: GitHub Actions) on first run, so no
-      # manual Settings -> Pages step is needed.
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
+      - uses: actions/checkout@v7
       - uses: voidzero-dev/setup-vp@v1.20.0
         with:
           node-version: "24"
@@ -30,7 +25,7 @@ jobs:
       - run: vp build
         env:
           VITE_BASE: /td-poc/
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
   deploy:
@@ -41,4 +36,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
