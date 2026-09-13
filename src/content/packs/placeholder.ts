@@ -79,5 +79,6 @@ export const PLACEHOLDER_PACK: ContentPack = {
     nextWave: "Next wave",
     victory: "Bastion holds",
     defeat: "Bastion falls",
+    runAgain: "Run again",
   },
 };

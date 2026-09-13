@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { COLORS, VIEW_H, VIEW_W } from "./layout.ts";
 import { BootScene } from "./scenes/BootScene.ts";
+import { RunScene } from "./scenes/RunScene.ts";
 
 export function createGame(parent: string): Phaser.Game {
   return new Phaser.Game({
@@ -14,6 +15,6 @@ export function createGame(parent: string): Phaser.Game {
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     render: { pixelArt: false, antialias: true },
-    scene: [BootScene],
+    scene: [BootScene, RunScene],
   });
 }

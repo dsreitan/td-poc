@@ -12,4 +12,5 @@ export * from "./combat/WaveSim.ts";
 export * from "./combat/runWave.ts";
 export * from "./stats/RunStats.ts";
 export * from "./stats/aggregate.ts";
+export * from "./Run.ts";
 export { Rng } from "./rng.ts";
