@@ -37,6 +37,11 @@ export default defineConfig({
     },
     overrides: [
       {
+        // CLI scripts print to stdout by design.
+        files: ["scripts/**"],
+        rules: { "no-console": "off" },
+      },
+      {
         // The simulation is pure TypeScript. It must never import the
         // renderer or Phaser, and must never use unseeded randomness.
         // tests/boundary.test.ts enforces the same rule independently.
@@ -71,7 +76,8 @@ export default defineConfig({
   run: {
     tasks: {
       // Balance harness (M2+): headless seeded runs, prints wave clear rates.
-      "sim:bench": { command: "vp exec vite-node scripts/bench.ts", cache: false },
+      // Node 22.18+/24 strips types natively; no transpile step needed.
+      "sim:bench": { command: "node scripts/bench.ts", cache: false },
     },
   },
 });

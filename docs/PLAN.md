@@ -395,7 +395,7 @@ writing:
 | Language | **TypeScript 7.0** (Go compiler) | 10× faster type checks; Vite+ already type-checks through the Go toolchain (tsgolint), so the `typescript` package matches it. |
 | Runtime | **Node 24 LTS** in CI, `^22.18 \|\| ^24.11` accepted locally | 24 is current LTS. 22 accepted so this dev container works. |
 | Bundler / dev | Vite 8 + Rolldown via Vite+ | Rolldown is the default in Vite 8. |
-| Tests / lint / fmt | Vitest 4, Oxlint, Oxfmt via Vite+ | Rust tooling, one config. |
+| Tests / lint / fmt | Vitest, Oxlint, Oxfmt as bundled by Vite+ | One config, one pin. Vitest 5.0 is out but Vite+ 0.3.1 pins 4.1; we follow Vite+ rather than run a second Vitest beside it, and move the day Vite+ does. |
 | HTML / CSS | Plain, modern. `viewport-fit=cover`, `dvh` units, `env(safe-area-inset-*)`, container queries where a DOM overlay exists. No CSS framework: the game is one canvas plus a few overlays. | |
 | Mobile wrapper | Capacitor, latest major, post-gate | |
 

@@ -17,7 +17,8 @@ export type ResourceKind = "ammo" | "heat" | "mana";
 
 export type StatusKind = "slow" | "burn";
 
-export type BuffKind = "attackSpeedPct" | "flatDamage" | "laneReach";
+/** Buffs a support grants to an adjacent weapon. `*OnHit` carry a status magnitude. */
+export type BuffKind = "attackSpeedPct" | "flatDamage" | "laneReach" | "slowOnHit" | "burnOnHit";
 
 export interface Ports {
   readonly provides?: readonly ResourceKind[];
