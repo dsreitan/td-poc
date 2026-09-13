@@ -90,9 +90,10 @@ export class BackpackView {
   private createView(item: PlacedItem): ItemView {
     const def = itemDef(item.defId);
     const color = ITEM_CLASS_COLORS[def.itemClass] ?? 0xffffff;
+    // Children are centred on the container so Phaser's centre-origin hit
+    // area for Containers matches what is drawn. Never draw from (0,0) here.
     const body = this.scene.add
       .rectangle(0, 0, CELL - 8, CELL - 8, color)
-      .setOrigin(0, 0)
       .setStrokeStyle(2, 0x000000, 0.35);
     const label = this.scene.add
       .text(0, 0, "", {
@@ -175,9 +176,9 @@ export class BackpackView {
     const w = (maxC - minC + 1) * CELL - 8;
     const h = (maxR - minR + 1) * CELL - 8;
     const { x, y } = cellToXY(minC, minR);
-    v.root.setPosition(x + 4, y + 4);
+    v.root.setPosition(x + 4 + w / 2, y + 4 + h / 2);
     v.root.setSize(w, h);
-    v.root.input?.hitArea?.setTo?.(0, 0, w, h);
+    (v.root.input?.hitArea as Phaser.Geom.Rectangle | undefined)?.setTo(0, 0, w, h);
     v.body.setSize(w, h);
     const text = itemText(CONTENT, v.item.defId);
     const tier = v.item.tier > 1 ? ` ${"★".repeat(v.item.tier - 1)}` : "";
@@ -186,7 +187,7 @@ export class BackpackView {
     const longest = Math.max(...text.name.split(" ").map((p) => p.length));
     v.label.setFontSize(longest > 8 ? "9px" : "11px");
     v.label.setWordWrapWidth(w - 6);
-    v.label.setPosition(w / 2, h / 2);
+    v.label.setPosition(0, 0);
   }
 
   private anchorFor(pointer: Phaser.Input.Pointer, grab: Cell): Cell | undefined {

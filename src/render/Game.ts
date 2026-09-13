@@ -27,6 +27,10 @@ export function createGame(parent: string, seed?: number): Phaser.Game {
     callbacks: {
       postBoot: (game) => {
         game.registry.set("seed", seed);
+        // `?e2e=1` exposes the game for end-to-end tests (read-only use).
+        if (new URLSearchParams(window.location.search).get("e2e") === "1") {
+          (window as unknown as { __bb: Phaser.Game }).__bb = game;
+        }
       },
     },
   });

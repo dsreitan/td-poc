@@ -157,13 +157,6 @@ export function autopilot(run: Run, maxWaves = 50): AutopilotResult {
     run.startWave();
     while ((run.phase as RunPhase) === "wave") {
       run.stepWave();
-      // Use Volley on the lane with the most enemies once it is ready.
-      const snap = run.waveSim?.snapshot();
-      if (snap && run.abilityCooldown === 0 && snap.enemies.length > 0) {
-        const counts = Array.from({ length: LANES }, () => 0);
-        for (const e of snap.enemies) counts[e.lane]!++;
-        run.useAbility(counts.indexOf(Math.max(...counts)));
-      }
     }
   }
   return {

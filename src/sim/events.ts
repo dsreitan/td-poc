@@ -12,7 +12,6 @@ export type Source =
       readonly itemId: string;
       readonly via: "shot" | "splash" | "burn" | "pierce" | "retaliation" | "status";
     }
-  | { readonly kind: "ability"; readonly ability: "volley" }
   | { readonly kind: "boss"; readonly bossId: number; readonly phase: number }
   | { readonly kind: "wave" };
 
@@ -65,7 +64,6 @@ export type SimEvent =
       readonly baseDamage: number;
     }
   | { readonly t: "itemChargeUsed"; readonly itemId: string; readonly remaining: number }
-  | { readonly t: "abilityUsed"; readonly lane: number }
   | { readonly t: "bossPhaseEntered"; readonly bossId: number; readonly phase: number }
   | {
       readonly t: "itemXpGained";
@@ -98,8 +96,6 @@ export function sourceKey(s: Source): string {
   switch (s.kind) {
     case "item":
       return `item:${s.itemId}`;
-    case "ability":
-      return `ability:${s.ability}`;
     case "boss":
       return `boss:${s.bossId}`;
     case "wave":

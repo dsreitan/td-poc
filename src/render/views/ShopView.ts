@@ -89,7 +89,11 @@ export class ShopView {
       .setDepth(3);
 
     for (let i = 0; i < 4; i++) {
-      const home = { x: SHOP_X + i * SHOP_SLOT, y: SHOP_A_Y + 3 };
+      // Card centre. Containers hit-test around their centre, so children are drawn centred too.
+      const home = {
+        x: SHOP_X + i * SHOP_SLOT + (SHOP_SLOT - 4) / 2,
+        y: SHOP_A_Y + 3 + (SHOP_A_H - 6) / 2,
+      };
       this.offers.push(
         this.createCard(
           home,
@@ -129,7 +133,7 @@ export class ShopView {
       })
       .setOrigin(0.5);
     this.bench = this.createCard(
-      { x: BENCH_X, y: SHOP_B_Y + 3 },
+      { x: BENCH_X + BENCH_W / 2, y: SHOP_B_Y + 3 + (SHOP_B_H - 6) / 2 },
       BENCH_W,
       SHOP_B_H - 6,
       () => ({ from: "bench" }),
@@ -160,12 +164,9 @@ export class ShopView {
     source: () => DragSource,
     onDrop: (o: Drop) => void,
   ): Card {
-    const body = this.scene.add
-      .rectangle(0, 0, w, h, 0x000000)
-      .setOrigin(0, 0)
-      .setStrokeStyle(1, 0x000000, 0.3);
+    const body = this.scene.add.rectangle(0, 0, w, h, 0x000000).setStrokeStyle(1, 0x000000, 0.3);
     const name = this.scene.add
-      .text(w / 2, 6, "", {
+      .text(0, -h / 2 + 6, "", {
         fontFamily: "monospace",
         fontSize: "10px",
         color: COLORS.textDark,
@@ -174,7 +175,7 @@ export class ShopView {
       })
       .setOrigin(0.5, 0);
     const cost = this.scene.add
-      .text(w / 2, h - 10, "", {
+      .text(0, h / 2 - 10, "", {
         fontFamily: "monospace",
         fontSize: "11px",
         color: COLORS.textDark,

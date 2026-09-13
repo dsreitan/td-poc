@@ -25,6 +25,8 @@ jobs:
       - run: vp build
         env:
           VITE_BASE: /td-poc/
+      - run: npx playwright install --with-deps chromium
+      - run: vp run e2e
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist

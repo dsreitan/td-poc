@@ -419,21 +419,6 @@ export class Run {
     return { ok: true, kind: preview.kind, resultId };
   }
 
-  // --------------------------------------------------------------- ability
-
-  /** Volley: every weapon covering `lane` fires now at +50% damage. */
-  useAbility(lane: number): boolean {
-    if (this._phase !== "wave" || !this.sim) return false;
-    const events = this.sim.useVolley(lane).map((ev) => ({ tick: this.sim!.tick, ev }));
-    this.waveEvents.push(...events);
-    for (const { ev } of events) if (ev.t === "goldEarned") this._gold += ev.amount;
-    return events.length > 0;
-  }
-
-  get abilityCooldown(): number {
-    return this.sim?.volleyCooldown ?? 0;
-  }
-
   // --------------------------------------------------------------- wave
 
   startWave(): WaveSim | undefined {

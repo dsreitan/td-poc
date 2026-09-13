@@ -24,7 +24,7 @@ non-negotiable from commit one. It gives us:
 - the option to swap the renderer.
 
 **Portrait split.** 40/60 works. The top 40% needs very little interaction
-(one ability button, speed toggle), so all touch precision lives in the bottom
+(speed toggle only), so all touch precision lives in the bottom
 60% where thumbs are.
 
 **Wave preview.** Correctly identified as essential. Without it, lane
@@ -36,7 +36,7 @@ of *optimise once*.
 
 | Risk | Why it matters | Plan |
 |---|---|---|
-| **Waves are passive.** Backpack is locked, so the player watches for 20–30 s per wave, ten times. | Boredom in the phase that is supposed to be the payoff. | Keep waves short (20–35 s). Add a 2× speed toggle from day one. Hero ability is the only mid-wave input; make it lane-targeted so it also reads as a positional decision. Measure: do testers reach for speed-up immediately? If yes, waves need more to watch. |
+| **Waves are passive.** Backpack is locked, so the player watches for 20–30 s per wave, ten times. | Boredom in the phase that is supposed to be the payoff. | Keep waves short (20–35 s). Add a 2× speed toggle from day one. There is no mid-wave input (§2.10), so measure: do testers reach for speed-up immediately? If yes, waves need more to watch. |
 | **Column lock makes layouts obvious.** With 4 lanes and 20 cells, "one weapon per column, supports in the gaps" may be the answer every time. | Kills the optimisation loop. | Wave preview varies lane pressure per wave. Make **rows** mean something too (see §2.3: breach hits the top item in that column; front row fires first). Two-cell items whose lane coverage depends on orientation. Coin purse and merge fodder compete for space. |
 | **Three systems is a lot for a POC.** Merge + spatial + TD + crafting + factory flow. | Scope creep before the core is validated. | Milestone 3 is the *gate*: grid + drag + one wave with placeholder art. Merge, recipes, ability and save come after the gate. Factory flow is post-POC (see §1.3). |
 | **Space is very tight.** 20 cells, 12 items, some 2-cell, plus merge needs duplicates parked somewhere. | Merging may feel impossible; or the grid may need to grow. | Merge happens on drop (drag same item onto same item), so fodder never has to sit in the grid. Shop shows one “bench” slot for holding one item between waves. Keep 4×5 for POC; grid size is a data constant. |
@@ -257,11 +257,16 @@ Wave 1–3: grunts, then runners. Wave 4 introduces armored. Wave 5: Warden.
 Wave 6 swarmlings. Wave 7–9 mix, with a deliberate lane skew each wave so the
 player has a reason to move things. Wave 10: Bulwark + escort.
 
-### 2.10 Hero ability (one)
+### 2.10 No active input during a wave
 
-**Volley:** tap a lane; every weapon covering that lane fires immediately with
-+50% damage. Cooldown 300 ticks (15 s). Lane-targeted so it is still a spatial
-decision, and it teaches coverage.
+Decision (2026-09-13): there is no hero ability and no mid-wave input of
+any kind. Once "Start wave" is tapped the outcome is fully determined by the
+bag, the wave and the seed. The only wave-time controls are the speed toggle
+and watching. This keeps replays trivially exact, keeps async PvP fair, and
+puts the whole decision budget where the design wants it: in the shop.
+
+(The original pitch allowed "one active hero ability at most"; a lane-
+targeted Volley was built in M6 and removed again the same day.)
 
 ### 2.11 Save
 
@@ -735,7 +740,7 @@ working-day counts for one developer.
 
 - Tier-up on drop, three recipes, drop-target highlighting (green = merge,
   gold = craft, red = invalid).
-- Volley ability with lane tap and cooldown.
+- (Volley ability: built, then removed by decision, §2.10.)
 - Tests: merge only same tier, craft refused if result shape does not fit.
 
 ### M7 — Save, tuning, polish (2 d)

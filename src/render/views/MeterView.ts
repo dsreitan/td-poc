@@ -33,7 +33,6 @@ export class MeterView {
       const defId = it?.defId ?? s.source.itemId.split("#")[0]!;
       return itemText(CONTENT, defId).name;
     }
-    if (s.source.kind === "ability") return ui(CONTENT, "ability");
     if (s.source.kind === "boss") return ui(CONTENT, "boss");
     return ui(CONTENT, "wave");
   }

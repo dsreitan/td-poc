@@ -204,8 +204,8 @@ describe("WaveSim: weapons", () => {
       wave: wave([{ tick: 0, lane: 0, enemy: "grunt", count: 4, spacingTicks: 0 }]),
       rng: new Rng(1),
     });
-    const firstVolley = evs(run.events, "enemyDamaged").slice(0, 3);
-    expect(firstVolley.map((d) => d.source)).toEqual([
+    const firstShot = evs(run.events, "enemyDamaged").slice(0, 3);
+    expect(firstShot.map((d) => d.source)).toEqual([
       { kind: "item", itemId: "bl", via: "shot" },
       { kind: "item", itemId: "bl", via: "pierce" },
       { kind: "item", itemId: "bl", via: "pierce" },

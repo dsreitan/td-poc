@@ -78,6 +78,8 @@ export default defineConfig({
       // Balance harness (M2+): headless seeded runs, prints wave clear rates.
       // Node 22.18+/24 strips types natively; no transpile step needed.
       "sim:bench": { command: "node scripts/bench.ts", cache: false },
+      // Browser tests against dist/. Needs `vp build` first and a Chromium (E2E_CHROMIUM or playwright's).
+      e2e: { command: "node scripts/e2e.ts", cache: false },
     },
   },
 });
