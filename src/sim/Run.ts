@@ -11,7 +11,7 @@ import type { Cell, Orientation } from "./grid/shapes.ts";
 import { itemDef, SHOP_ITEM_DEFS } from "./items/defs.ts";
 import { canMerge, mergedTier } from "./items/merge.ts";
 import { findRecipe } from "./items/recipes.ts";
-import { tierData, type ItemDef, type Tier } from "./items/types.ts";
+import { isWeapon, tierData, type ItemDef, type Tier } from "./items/types.ts";
 import { DEFAULT_MODIFIERS, type RunModifiers } from "./modifiers.ts";
 import { Rng } from "./rng.ts";
 import { reduceWave, type WaveStats } from "./stats/RunStats.ts";
@@ -218,6 +218,18 @@ export class Run {
     for (let i = 0; i < SHOP_SIZE; i++) {
       const def = this.rng.pick(SHOP_ITEM_DEFS);
       this._offers.push({ defId: def.id, cost: def.cost });
+    }
+    // The very first shop always shows at least two weapons, so every run
+    // can cover the two lanes wave 1 uses. Later shops are pure rolls.
+    if (this._waveIndex === 0 && this._rerolls === 0 && this.waveStats.length === 0) {
+      const weapons = SHOP_ITEM_DEFS.filter(isWeapon);
+      for (let i = 0; i < 2; i++) {
+        const cur = this._offers[i]!;
+        if (!isWeapon(itemDef(cur.defId))) {
+          const def = this.rng.pick(weapons);
+          this._offers[i] = { defId: def.id, cost: def.cost };
+        }
+      }
     }
   }
 

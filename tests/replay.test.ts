@@ -30,7 +30,7 @@ const REFERENCE = () =>
     ["spiked_shield", { col: 1, row: 2 }, 0, 1, "sh"],
   ]);
 
-const GOLDEN = "3c4ec5fd";
+const GOLDEN = "2cf2fa16";
 
 describe("replay determinism", () => {
   it("two runs with the same inputs produce identical events", () => {

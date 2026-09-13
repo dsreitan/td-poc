@@ -146,6 +146,28 @@ export class BattleView {
           break;
         case "enemyDamaged": {
           const s = this.enemies.get(ev.id);
+          // Floating damage number for direct hits (burn ticks would be spam).
+          if (s && ev.amount > 0 && ev.source.kind === "item" && ev.source.via !== "burn") {
+            const big = ev.amount >= 10;
+            const num = this.scene.add
+              .text(s.body.x + (ev.id % 3) * 6 - 6, s.body.y - 12, String(ev.amount), {
+                fontFamily: "monospace",
+                fontSize: big ? "14px" : "11px",
+                color: ev.source.via === "splash" ? "#ffc857" : "#ffffff",
+                stroke: "#000000",
+                strokeThickness: 2,
+              })
+              .setOrigin(0.5, 1)
+              .setDepth(9);
+            this.scene.tweens.add({
+              targets: num,
+              y: num.y - 22,
+              alpha: 0,
+              duration: 450,
+              ease: "Cubic.easeOut",
+              onComplete: () => num.destroy(),
+            });
+          }
           if (s) {
             s.body.setFillStyle(0xffffff);
             this.scene.time.delayedCall(60, () => {

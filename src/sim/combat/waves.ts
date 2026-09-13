@@ -90,21 +90,22 @@ export const WAVES: readonly WaveDef[] = [
   {
     id: 1,
     clearBonus: 5,
+    // Two lanes only: the first shop cannot cover four.
     spawns: [
-      { tick: 0, lane: 1, enemy: "grunt", count: 2, spacingTicks: 40 },
-      { tick: 20, lane: 2, enemy: "grunt", count: 2, spacingTicks: 40 },
-      { tick: 100, lane: 0, enemy: "grunt", count: 2, spacingTicks: 40 },
-      { tick: 120, lane: 3, enemy: "grunt", count: 2, spacingTicks: 40 },
+      { tick: 0, lane: 1, enemy: "grunt", count: 3, spacingTicks: 45 },
+      { tick: 30, lane: 2, enemy: "grunt", count: 3, spacingTicks: 45 },
+      { tick: 170, lane: 1, enemy: "grunt", count: 1, spacingTicks: 0 },
+      { tick: 190, lane: 2, enemy: "grunt", count: 1, spacingTicks: 0 },
     ],
   },
   {
     id: 2,
     clearBonus: 6,
+    // Lane 0 opens; lane 3 still quiet.
     spawns: [
       { tick: 0, lane: 0, enemy: "grunt", count: 3, spacingTicks: 45 },
-      { tick: 0, lane: 3, enemy: "grunt", count: 3, spacingTicks: 45 },
-      { tick: 80, lane: 1, enemy: "grunt", count: 2, spacingTicks: 40 },
-      { tick: 80, lane: 2, enemy: "grunt", count: 2, spacingTicks: 40 },
+      { tick: 20, lane: 1, enemy: "grunt", count: 3, spacingTicks: 45 },
+      { tick: 40, lane: 2, enemy: "grunt", count: 3, spacingTicks: 45 },
       { tick: 220, lane: 1, enemy: "runner", count: 2, spacingTicks: 30 },
     ],
   },
@@ -161,11 +162,12 @@ export const WAVES: readonly WaveDef[] = [
     clearBonus: 10,
     // Skew hard left: lanes 0 and 1 take almost everything.
     spawns: [
-      { tick: 0, lane: 0, enemy: "armored", count: 3, spacingTicks: 60 },
-      { tick: 20, lane: 1, enemy: "grunt", count: 5, spacingTicks: 25 },
+      { tick: 0, lane: 0, enemy: "armored", count: 3, spacingTicks: 55 },
+      { tick: 20, lane: 1, enemy: "grunt", count: 6, spacingTicks: 22 },
       { tick: 100, lane: 0, enemy: "runner", count: 4, spacingTicks: 20 },
       { tick: 160, lane: 1, enemy: "swarmling", count: 6, spacingTicks: 8 },
-      { tick: 240, lane: 3, enemy: "runner", count: 2, spacingTicks: 20 },
+      { tick: 240, lane: 3, enemy: "runner", count: 3, spacingTicks: 20 },
+      { tick: 260, lane: 2, enemy: "armored", count: 1, spacingTicks: 0 },
     ],
   },
   {
@@ -173,8 +175,8 @@ export const WAVES: readonly WaveDef[] = [
     clearBonus: 11,
     // Skew hard right, faster.
     spawns: [
-      { tick: 0, lane: 3, enemy: "armored", count: 3, spacingTicks: 50 },
-      { tick: 0, lane: 2, enemy: "runner", count: 5, spacingTicks: 18 },
+      { tick: 0, lane: 3, enemy: "armored", count: 4, spacingTicks: 45 },
+      { tick: 0, lane: 2, enemy: "runner", count: 6, spacingTicks: 16 },
       { tick: 80, lane: 3, enemy: "swarmling", count: 8, spacingTicks: 7 },
       { tick: 140, lane: 2, enemy: "grunt", count: 5, spacingTicks: 22 },
       { tick: 200, lane: 0, enemy: "grunt", count: 2, spacingTicks: 30 },
@@ -189,8 +191,8 @@ export const WAVES: readonly WaveDef[] = [
       { tick: 0, lane: 1, enemy: "armored", count: 2, spacingTicks: 60 },
       { tick: 0, lane: 2, enemy: "swarmling", count: 8, spacingTicks: 7 },
       { tick: 0, lane: 3, enemy: "grunt", count: 5, spacingTicks: 24 },
-      { tick: 220, lane: 0, enemy: "armored", count: 2, spacingTicks: 50 },
-      { tick: 220, lane: 1, enemy: "swarmling", count: 8, spacingTicks: 7 },
+      { tick: 220, lane: 0, enemy: "armored", count: 3, spacingTicks: 45 },
+      { tick: 220, lane: 1, enemy: "swarmling", count: 10, spacingTicks: 6 },
       { tick: 220, lane: 2, enemy: "runner", count: 4, spacingTicks: 18 },
       { tick: 220, lane: 3, enemy: "armored", count: 2, spacingTicks: 50 },
     ],

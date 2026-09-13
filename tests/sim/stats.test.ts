@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { runWave } from "../../src/sim/combat/runWave.ts";
-import { waveDef } from "../../src/sim/combat/waves.ts";
+import { previewWave, waveDef } from "../../src/sim/combat/waves.ts";
 import { Rng } from "../../src/sim/rng.ts";
 import { aggregate } from "../../src/sim/stats/aggregate.ts";
 import { reduceWave, StatsAccumulator, topDamage } from "../../src/sim/stats/RunStats.ts";
@@ -17,12 +17,12 @@ describe("stats reducer", () => {
     ]);
 
   it("attributes damage, kills, shots and gold per item, and wave gold to the wave", () => {
-    const run = runWave({ backpack: bp(), wave: waveDef(1), rng: new Rng(1) });
+    const run = runWave({ backpack: bp(), wave: waveDef(2), rng: new Rng(1) });
     const st = reduceWave(run.events);
-    expect(st.wave).toBe(1);
+    expect(st.wave).toBe(2);
     expect(st.result).toBe("cleared");
     expect(st.ticks).toBe(run.ticks);
-    expect(st.enemiesSpawned).toBe(8);
+    expect(st.enemiesSpawned).toBe(previewWave(waveDef(2)).total);
     const xb = st.sources["item:xb"]!;
     const cn = st.sources["item:cn"]!;
     expect(xb.shots).toBeGreaterThan(0);
@@ -31,7 +31,7 @@ describe("stats reducer", () => {
     expect(cn.totalDamage).toBe(cn.damage.shot + cn.damage.splash);
     const totalKills = Object.values(st.sources).reduce((a, s) => a + s.kills, 0);
     expect(totalKills).toBe(st.enemiesKilled);
-    expect(st.sources["wave"]!.gold).toBe(waveDef(1).clearBonus);
+    expect(st.sources["wave"]!.gold).toBe(waveDef(2).clearBonus);
     const goldSum = Object.values(st.sources).reduce((a, s) => a + s.gold, 0);
     expect(goldSum).toBe(st.totalGold);
   });
