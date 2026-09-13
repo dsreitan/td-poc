@@ -11,7 +11,8 @@ import {
   GRID_ROWS,
   ITEM_CLASS_COLORS,
   cellToXY,
-  inShopRow,
+  inBench,
+  inSellZone,
   xyToCell,
 } from "../layout.ts";
 
@@ -135,7 +136,9 @@ export class BackpackView {
       this.hooks.onHover(undefined, false);
       const cur = this.views.get(item.id)?.item;
       if (!cur) return;
-      if (inShopRow(pointer.y)) {
+      if (inBench(pointer.x, pointer.y)) {
+        this.run.toBench(item.id);
+      } else if (inSellZone(pointer.x, pointer.y)) {
         this.run.sell(item.id);
       } else {
         const anchor = this.anchorFor(pointer, grab);
@@ -176,6 +179,9 @@ export class BackpackView {
     const text = itemText(CONTENT, v.item.defId);
     const tier = v.item.tier > 1 ? ` ${"★".repeat(v.item.tier - 1)}` : "";
     v.label.setText(`${text.name}${tier}`);
+    // Long single words (e.g. "Ammunition") must not clip in one cell.
+    const longest = Math.max(...text.name.split(" ").map((p) => p.length));
+    v.label.setFontSize(longest > 8 ? "9px" : "11px");
     v.label.setWordWrapWidth(w - 6);
     v.label.setPosition(w / 2, h / 2);
   }
@@ -195,8 +201,12 @@ export class BackpackView {
     shapeDefId?: string,
   ): void {
     this.ghost.clear();
-    if (inShopRow(pointer.y)) {
-      this.hooks.onHover(undefined, ignoreId !== undefined);
+    if (inSellZone(pointer.x, pointer.y)) {
+      this.hooks.onHover(undefined, true);
+      return;
+    }
+    if (inBench(pointer.x, pointer.y)) {
+      this.hooks.onHover(undefined, false);
       return;
     }
     const anchor = this.anchorFor(pointer, grab);
@@ -223,9 +233,13 @@ export class BackpackView {
     this.previewAt(pointer, undefined, orientation, { col: 0, row: 0 }, defId);
   }
 
-  externalDrop(pointer: Phaser.Input.Pointer): Cell | undefined {
+  externalDrop(): void {
     this.ghost.clear();
     this.hooks.onHover(undefined, false);
+  }
+
+  /** Grid anchor under the pointer for a 1-cell grab offset, or undefined outside the grid. */
+  anchorAt(pointer: Phaser.Input.Pointer): Cell | undefined {
     return this.anchorFor(pointer, { col: 0, row: 0 });
   }
 

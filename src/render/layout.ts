@@ -20,20 +20,34 @@ export const LANES = 4;
 export const LANE_W = VIEW_W / LANES;
 
 /** Backpack grid; columns align with lanes. */
-export const CELL = 72;
+export const CELL = 68;
 export const GRID_COLS = 4;
 export const GRID_ROWS = 5;
 export const GRID_X = (VIEW_W - CELL * GRID_COLS) / 2;
 export const GRID_Y = PANEL_Y + 8;
 export const GRID_H = CELL * GRID_ROWS;
 
-/** Shop row under the grid. Doubles as the sell zone while dragging. */
-export const SHOP_Y = GRID_Y + GRID_H + 8;
-export const SHOP_H = VIEW_H - SHOP_Y - 8;
-export const SHOP_SLOT = 70;
+/** Shop, two rows under the grid. Row A: offers + reroll. Row B: bench + start. */
+export const SHOP_Y = GRID_Y + GRID_H + 6;
+export const SHOP_A_Y = SHOP_Y;
+export const SHOP_A_H = 60;
+export const SHOP_B_Y = SHOP_A_Y + SHOP_A_H + 4;
+export const SHOP_B_H = VIEW_H - SHOP_B_Y - 6;
+export const SHOP_H = VIEW_H - SHOP_Y - 6;
+export const SHOP_SLOT = 64;
 export const SHOP_X = 4;
-export const START_BTN_X = SHOP_X + SHOP_SLOT * 4 + 6;
+export const REROLL_X = SHOP_X + SHOP_SLOT * 4 + 6;
+export const REROLL_W = VIEW_W - REROLL_X - 4;
+export const BENCH_X = SHOP_X;
+export const BENCH_W = SHOP_SLOT - 4;
+export const START_BTN_X = BENCH_X + BENCH_W + 6;
 export const START_BTN_W = VIEW_W - START_BTN_X - 4;
+
+/** Battlefield sub-areas used during the shop phase. */
+export const PREVIEW_Y = HUD_H + 6;
+export const PREVIEW_H = 160;
+export const METER_Y = PREVIEW_Y + PREVIEW_H + 6;
+export const METER_H = BATTLE_H - METER_Y - 8;
 
 export const COLORS = {
   bg: 0x14161c,
@@ -92,6 +106,11 @@ export function posToY(pos: number): number {
   return BASE_Y - (pos / 1000) * (BASE_Y - SPAWN_Y);
 }
 
-export function inShopRow(y: number): boolean {
-  return y >= SHOP_Y && y <= SHOP_Y + SHOP_H;
+export function inBench(x: number, y: number): boolean {
+  return x >= BENCH_X && x <= BENCH_X + BENCH_W && y >= SHOP_B_Y && y <= SHOP_B_Y + SHOP_B_H;
+}
+
+/** Anywhere in the shop area except the bench slot sells the dragged item. */
+export function inSellZone(x: number, y: number): boolean {
+  return y >= SHOP_Y && y <= SHOP_Y + SHOP_H && !inBench(x, y);
 }

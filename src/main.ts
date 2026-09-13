@@ -1,3 +1,3 @@
-import { createGame } from "./render/Game.ts";
+import { createGame, seedFromUrl } from "./render/Game.ts";
 
-createGame("game");
+createGame("game", seedFromUrl(window.location.search));

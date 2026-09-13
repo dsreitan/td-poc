@@ -3,9 +3,14 @@ import { CONTENT, ui } from "../../content/index.ts";
 import { Run } from "../../sim/Run.ts";
 import { TICKS_PER_SECOND } from "../../sim/modifiers.ts";
 import { BATTLE_H, COLORS, VIEW_W } from "../layout.ts";
+import { previewWave } from "../../sim/combat/waves.ts";
+import { aggregate } from "../../sim/stats/aggregate.ts";
+import { StatsAccumulator } from "../../sim/stats/RunStats.ts";
 import { BackpackView } from "../views/BackpackView.ts";
 import { BattleView } from "../views/BattleView.ts";
 import { HudView } from "../views/HudView.ts";
+import { MeterView } from "../views/MeterView.ts";
+import { PreviewView } from "../views/PreviewView.ts";
 import { ShopView } from "../views/ShopView.ts";
 
 const TICK_MS = 1000 / TICKS_PER_SECOND;
@@ -17,6 +22,9 @@ export class RunScene extends Phaser.Scene {
   private bag!: BackpackView;
   private shop!: ShopView;
   private hud!: HudView;
+  private preview!: PreviewView;
+  private meter!: MeterView;
+  private live: StatsAccumulator | undefined;
   private acc = 0;
   private banner: Phaser.GameObjects.Container | undefined;
 
@@ -25,7 +33,8 @@ export class RunScene extends Phaser.Scene {
   }
 
   create(data?: { seed?: number }): void {
-    const seed = data?.seed ?? Date.now() % 1_000_000;
+    const urlSeed = this.registry.get("seed") as number | undefined;
+    const seed = data?.seed ?? urlSeed ?? Date.now() % 1_000_000;
     this.run = new Run({ seed });
     this.acc = 0;
 
@@ -46,7 +55,17 @@ export class RunScene extends Phaser.Scene {
       () => this.startWave(),
     );
     this.hud = new HudView(this, this.run);
+    this.preview = new PreviewView(this);
+    this.meter = new MeterView(this, this.run.backpack);
     this.refresh();
+    this.showShopOverlays();
+  }
+
+  /** During the shop phase the battlefield shows next wave + last wave's meter. */
+  private showShopOverlays(): void {
+    const wave = this.run.currentWave;
+    this.preview.show(wave ? previewWave(wave) : undefined);
+    this.meter.showSummary(this.run.waveStats.at(-1));
   }
 
   private refresh(): void {
@@ -60,6 +79,9 @@ export class RunScene extends Phaser.Scene {
     this.battle.reset();
     this.bag.setLocked(true);
     this.shop.setLocked(true);
+    this.preview.hide();
+    this.meter.clear();
+    this.live = new StatsAccumulator(this.run.waveNumber);
     this.acc = 0;
   }
 
@@ -75,32 +97,34 @@ export class RunScene extends Phaser.Scene {
       this.battle.play(events.map((e) => e.ev));
       this.battle.sync(snap);
       this.hud.sync();
+      if (this.live) {
+        this.live.pushAll(events);
+        this.meter.showLive(this.live.stats);
+        this.meter.showBoss(snap);
+      }
       if (this.run.phase !== "wave") this.onWaveOver();
     }
   }
 
   private onWaveOver(): void {
     this.battle.sync(undefined);
+    this.meter.clear();
+    this.live = undefined;
     const stats = this.run.waveStats.at(-1);
     const phase = this.run.phase;
-    const title =
-      phase === "won"
-        ? ui(CONTENT, "victory")
-        : phase === "lost"
-          ? ui(CONTENT, "defeat")
-          : `${ui(CONTENT, "wave")} ${stats?.wave ?? ""} ✓`;
-    const sub = stats
-      ? `+${stats.totalGold} ${ui(CONTENT, "gold").toLowerCase()} · ${stats.enemiesKilled} kills · ${stats.baseDamage} base dmg`
-      : "";
-    this.showBanner(title, sub, phase === "won" || phase === "lost");
     if (phase === "shop") {
-      this.time.delayedCall(1400, () => {
-        this.hideBanner();
-        this.bag.setLocked(false);
-        this.shop.setLocked(false);
-        this.refresh();
-      });
+      // Straight back to the shop: the meter and preview are the reveal.
+      this.bag.setLocked(false);
+      this.shop.setLocked(false);
+      this.refresh();
+      this.showShopOverlays();
+      return;
     }
+    const agg = aggregate(this.run.waveStats);
+    const title = phase === "won" ? ui(CONTENT, "victory") : ui(CONTENT, "defeat");
+    const sub = `${agg.wavesCleared}/${this.run.waveCount} ${ui(CONTENT, "wavesCleared")} · ${agg.enemiesKilled} ${ui(CONTENT, "kills")} · ${agg.totalGold}g`;
+    void stats;
+    this.showBanner(title, sub, true);
   }
 
   private showBanner(title: string, sub: string, withRestart: boolean): void {
