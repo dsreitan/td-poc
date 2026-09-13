@@ -83,6 +83,17 @@ export class RunScene extends Phaser.Scene {
       (defId, tier) => this.showInfo(defId, tier),
     );
     this.hud = new HudView(this, this.run, () => this.newRun());
+
+    // Rotate the item being dragged: second finger (touch), right button, wheel, R or Space.
+    this.input.mouse?.disableContextMenu();
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      const drag = this.bag.currentDrag;
+      if (!drag) return;
+      if (pointer.id !== drag.pointerId || pointer.rightButtonDown()) this.bag.rotateActiveDrag();
+    });
+    this.input.on("wheel", () => this.bag.rotateActiveDrag());
+    this.input.keyboard?.on("keydown-R", () => this.bag.rotateActiveDrag());
+    this.input.keyboard?.on("keydown-SPACE", () => this.bag.rotateActiveDrag());
     this.preview = new PreviewView(this);
     this.meter = new MeterView(this, this.run.backpack);
     this.info = new InfoView(this, () => {

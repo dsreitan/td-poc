@@ -95,7 +95,7 @@ export const PLACEHOLDER_PACK: ContentPack = {
     newRun: "new",
     confirm: "sure?",
     hintFirstRun:
-      "Drag items from the shop into the bag. Each column guards the lane above it.\nTap an item to rotate it, hold it for details.",
+      "Drag items from the shop into the bag. Each column guards the lane above it.\nTap an item to rotate it, hold it for details.\nWhile dragging: tap with another finger (or press R) to rotate.",
     sellsFor: "sells for",
     dmg: "dmg",
     dps: "dps",

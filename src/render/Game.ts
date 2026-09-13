@@ -23,6 +23,8 @@ export function createGame(parent: string, seed?: number): Phaser.Game {
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     render: { pixelArt: false, antialias: true },
+    // Two touch points: one drags, a second tap rotates the dragged item.
+    input: { activePointers: 2 },
     scene: [BootScene, RunScene],
     callbacks: {
       postBoot: (game) => {

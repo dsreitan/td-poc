@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { CONTENT, itemText, ui } from "../../content/index.ts";
 import type { DragSource, Run } from "../../sim/Run.ts";
-import type { Orientation } from "../../sim/grid/shapes.ts";
+import { nextOrientation, type Orientation } from "../../sim/grid/shapes.ts";
 import { itemDef } from "../../sim/items/defs.ts";
 import {
   BENCH_W,
@@ -191,14 +191,27 @@ export class ShopView {
     const card: Card = { root, body, name, cost, home };
 
     let dragging = false;
-    const orientation: Orientation = 0;
-    root.on("dragstart", () => {
+    let orientation: Orientation = 0;
+    let lastPointer: Phaser.Input.Pointer | undefined;
+    root.on("dragstart", (pointer: Phaser.Input.Pointer) => {
       if (this.locked || !root.getData("defId")) return;
       dragging = true;
+      orientation = 0;
+      lastPointer = pointer;
       root.setDepth(10);
+      this.backpackView.setActiveDrag({
+        pointerId: pointer.id,
+        rotate: () => {
+          orientation = nextOrientation(orientation);
+          const defId = root.getData("defId") as string | undefined;
+          if (defId && lastPointer)
+            this.backpackView.externalPreview(lastPointer, defId, orientation, source());
+        },
+      });
     });
     root.on("drag", (pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
       if (!dragging) return;
+      lastPointer = pointer;
       root.setPosition(dragX, dragY);
       this.backpackView.externalPreview(
         pointer,
@@ -215,6 +228,7 @@ export class ShopView {
     root.on("dragend", (pointer: Phaser.Input.Pointer) => {
       if (!dragging) return;
       dragging = false;
+      this.backpackView.setActiveDrag(undefined);
       root.setDepth(3);
       this.backpackView.externalDrop();
       onDrop({ pointer, orientation });

@@ -2,7 +2,13 @@ import Phaser from "phaser";
 import { CONTENT, itemText } from "../../content/index.ts";
 import type { DragSource, Run } from "../../sim/Run.ts";
 import type { PlacedItem } from "../../sim/grid/Backpack.ts";
-import { footprint, nextOrientation, type Cell, type Orientation } from "../../sim/grid/shapes.ts";
+import {
+  bounds,
+  footprint,
+  nextOrientation,
+  type Cell,
+  type Orientation,
+} from "../../sim/grid/shapes.ts";
 import { itemDef } from "../../sim/items/defs.ts";
 import {
   CELL,
@@ -36,7 +42,30 @@ interface ItemView {
  * shop row to sell. Dragging from the shop is handled by ShopView, which
  * calls `beginExternalDrag` here so both share one ghost/highlight path.
  */
+/** The drag in progress, so other inputs (second finger, R key, wheel) can rotate it. */
+export interface ActiveDrag {
+  readonly pointerId: number;
+  rotate(): void;
+}
+
 export class BackpackView {
+  private activeDrag: ActiveDrag | undefined;
+
+  get currentDrag(): ActiveDrag | undefined {
+    return this.activeDrag;
+  }
+
+  setActiveDrag(drag: ActiveDrag | undefined): void {
+    this.activeDrag = drag;
+  }
+
+  /** Rotate whatever is being dragged. No-op when nothing is. */
+  rotateActiveDrag(): boolean {
+    if (!this.activeDrag) return false;
+    this.activeDrag.rotate();
+    return true;
+  }
+
   private readonly scene: Phaser.Scene;
   private readonly run: Run;
   private readonly hooks: DragHooks;
@@ -112,6 +141,9 @@ export class BackpackView {
 
     let dragging = false;
     let grab: Cell = { col: 0, row: 0 };
+    let lastPointer: Phaser.Input.Pointer | undefined;
+    // pointerup follows dragend; it must not count as a tap.
+    let justDragged = false;
     let orientation: Orientation = item.orientation;
     // Hold ~450 ms without moving: show details instead of rotating.
     let holdTimer: Phaser.Time.TimerEvent | undefined;
@@ -132,6 +164,17 @@ export class BackpackView {
       holdTimer?.remove(false);
       dragging = true;
       orientation = this.views.get(item.id)!.item.orientation;
+      lastPointer = pointer;
+      this.setActiveDrag({
+        pointerId: pointer.id,
+        rotate: () => {
+          orientation = nextOrientation(orientation);
+          // Show the new footprint on the dragged body.
+          const b = bounds(item.shape, orientation);
+          body.setSize(b.w * CELL - 8, b.h * CELL - 8);
+          if (lastPointer) this.previewAt(lastPointer, item.id, orientation, grab);
+        },
+      });
       const cell = xyToCell(pointer.x, pointer.y);
       const cur = this.views.get(item.id)!.item;
       grab = cell
@@ -142,12 +185,15 @@ export class BackpackView {
     });
     root.on("drag", (pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
       if (!dragging) return;
+      lastPointer = pointer;
       root.setPosition(dragX, dragY);
       this.previewAt(pointer, item.id, orientation, grab);
     });
     root.on("dragend", (pointer: Phaser.Input.Pointer) => {
       if (!dragging) return;
       dragging = false;
+      justDragged = true;
+      this.setActiveDrag(undefined);
       body.setAlpha(1);
       root.setDepth(3);
       this.ghost.clear();
@@ -170,6 +216,10 @@ export class BackpackView {
     });
     root.on("pointerup", () => {
       holdTimer?.remove(false);
+      if (justDragged) {
+        justDragged = false;
+        return;
+      }
       if (dragging || this.locked || held) return;
       // A tap without a drag rotates in place.
       this.run.rotate(item.id);
