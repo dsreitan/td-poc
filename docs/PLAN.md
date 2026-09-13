@@ -59,7 +59,7 @@ implement flow in the POC, but make the simulation model *ready* for it:
 If the gate passes, the first post-POC experiment is "heat": cannons generate
 heat, adjacent frost flasks vent it, overheated cannons stall. That is a real
 flow mechanic and it already uses two of the twelve items. The concrete
-readiness work is in §3.7.
+readiness work is in §3.8.
 
 ### 1.4 The one rule that keeps everything extensible
 
@@ -321,7 +321,7 @@ type SimEvent =
   | { t: 'abilityUsed'; lane: number }
   | { t: 'bossPhaseEntered'; bossId: number; phase: number }
   | { t: 'itemXpGained'; itemId: string; amount: number; source: Source }   // reserved, §6.1
-  | { t: 'resourceTransferred'; from: string; to: string; resource: ResourceKind; amount: number } // reserved, §3.7
+  | { t: 'resourceTransferred'; from: string; to: string; resource: ResourceKind; amount: number } // reserved, §3.8
   | { t: 'waveEnded'; result: 'cleared' | 'baseDestroyed'; ticks: number }
 ```
 
@@ -389,7 +389,83 @@ in 0.3.1):
   tools are all standard: `npx vitest`, `npx oxlint`, `npx vite` work on the
   same config. Fall back, note it in the commit, move on.
 
-### 3.6 Stats and telemetry (Backpack Battles-style)
+### 3.6 Deployment: GitHub Pages on every push to `main`
+
+The game is a static bundle (`vp build` → `dist/`), which is exactly what
+GitHub Pages serves. The repo is public, so Pages is free. Every merge to
+`main` publishes to `https://dsreitan.github.io/td-poc/` within about a
+minute, and that URL is what we open on a phone to test.
+
+Setup, once:
+
+1. Repo → Settings → Pages → Source: **GitHub Actions**.
+2. `vite.config.ts`: `base: process.env.VITE_BASE ?? '/'`. Pages serves the
+   site under `/td-poc/`, so the workflow sets `VITE_BASE=/td-poc/`; local
+   `vp dev` stays at `/`. A custom domain later just drops the env var.
+3. Workflow `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx vp lint && npx vp check && npx vp test
+      - run: npx vp build
+        env: { VITE_BASE: /td-poc/ }
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: dist }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+Notes:
+
+- Lint, typecheck and tests run in the same job, so a red build never
+  deploys. A separate `ci.yml` runs the same checks on pull requests without
+  the deploy step.
+- Vite emits hashed asset filenames, so the Pages CDN cache (about ten
+  minutes on `index.html`) is only ever a stale shell for a moment, never
+  stale code. A hard refresh on the phone fixes it if it bites.
+- Phaser has no server requirements. Save data is `localStorage`, which is
+  per-origin, so a Pages deploy and a local dev server keep separate saves.
+  Convenient for testing.
+- `vp env` pins Node for developers; CI uses `setup-node` with the same
+  major so both match. If `vp` needs its own install step in CI, the release
+  notes say so and the fallback is `npx vite build`, same config.
+- Add to home screen on Android gives a full-screen portrait test build
+  without Capacitor. A minimal `manifest.webmanifest` (display: standalone,
+  orientation: portrait) is a five-minute M0 addition and worth it.
+
+What Pages does **not** give us: preview URLs per pull request. One site per
+repo. If we want "try this branch on my phone" before merging, either deploy
+branches to a subfolder (`/td-poc/pr-42/`) with a second workflow, or put the
+same `dist/` on Cloudflare Pages or Netlify, both of which do PR previews for
+free. Not needed for the POC; `main` is the test build.
+
+### 3.7 Stats and telemetry (Backpack Battles-style)
 
 The post-wave and post-run stats screens are a **pure fold over the event
 stream**. No counters inside the combat sim, no second source of truth.
@@ -433,7 +509,7 @@ Post-run screen: damage share bar per item, best wave, gold curve, and the
 final build. Persist `RunStats` summaries to local storage for a run history
 list (cheap, and it is the seed of any later profile/RPG layer).
 
-### 3.7 Factory-flow readiness (no flow in the POC)
+### 3.8 Factory-flow readiness (no flow in the POC)
 
 What we build now so that resource flow is additive later:
 
@@ -473,7 +549,11 @@ working-day counts for one developer.
   `vite-plus` exactly, `vp env` pin for Node. `vp dev` shows a 360×800
   letterboxed canvas with the two-panel split and a "hello" rect in each.
 - Single `vite.config.ts` carrying test, lint and fmt config.
-- CI runs `vp lint`, `vp check`, `vp test`, `vp build`.
+- CI runs `vp lint`, `vp check`, `vp test`, `vp build` on pull requests;
+  the same plus deploy to GitHub Pages on push to `main` (§3.6). First
+  deploy is the "hello" canvas, so the pipeline is proven before there is
+  anything to test.
+- `manifest.webmanifest` for add-to-home-screen portrait testing on Android.
 - `src/sim` boundary rule in place in Oxlint, plus the grep test.
 - `vp hooks` installs a pre-commit `vp staged` so lint/format never reach CI.
 
@@ -639,7 +719,7 @@ Ready when:
   writes to that object. Replays then remain deterministic from
   `(seed, modifiers, decisions)`.
 - Saves are split: `RunSave` (current run, exists in POC) and `ProfileSave`
-  (persistent, empty in POC). Run history from §3.6 already lives on the
+  (persistent, empty in POC). Run history from §3.7 already lives on the
   profile side.
 - Stats are per-run and aggregable, so campaign nodes can set objectives
   ("clear wave 10 taking ≤5 base damage", "win with no cannons") checked
