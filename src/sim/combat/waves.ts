@@ -3,6 +3,7 @@
  * preview can never disagree with the wave. docs/PLAN.md §2.9.
  */
 import { LANES } from "./constants.ts";
+import { enemyDef, possibleLanes } from "./enemies.ts";
 
 export interface SpawnGroup {
   /** First spawn tick, relative to wave start. */
@@ -23,9 +24,11 @@ export interface WaveDef {
 
 export interface LanePreview {
   readonly lane: number;
-  /** enemy id -> count */
+  /** enemy id -> count of enemies that spawn here */
   readonly counts: Readonly<Record<string, number>>;
   readonly total: number;
+  /** Boss ids that may move into this lane mid-wave. */
+  readonly bossVisits: readonly string[];
 }
 
 export interface WavePreview {
@@ -40,6 +43,7 @@ export interface WavePreview {
 
 export function previewWave(def: WaveDef): WavePreview {
   const counts: Record<string, number>[] = Array.from({ length: LANES }, () => ({}));
+  const visits: Set<string>[] = Array.from({ length: LANES }, () => new Set<string>());
   const types = new Set<string>();
   let total = 0;
   let last = 0;
@@ -50,6 +54,9 @@ export function previewWave(def: WaveDef): WavePreview {
     types.add(g.enemy);
     total += g.count;
     last = Math.max(last, g.tick + (g.count - 1) * g.spacingTicks);
+    const ed = enemyDef(g.enemy);
+    if (ed.isBoss)
+      for (const l of possibleLanes(ed, g.lane, LANES)) if (l !== g.lane) visits[l]!.add(g.enemy);
   }
   return {
     wave: def.id,
@@ -57,6 +64,7 @@ export function previewWave(def: WaveDef): WavePreview {
       lane,
       counts: c,
       total: Object.values(c).reduce((a, b) => a + b, 0),
+      bossVisits: [...visits[lane]!].sort(),
     })),
     total,
     enemyTypes: [...types].sort(),
@@ -76,7 +84,8 @@ export function expandSpawns(def: WaveDef): { tick: number; lane: number; enemy:
   return out.map(({ tick, lane, enemy }) => ({ tick, lane, enemy }));
 }
 
-// M2 ships waves 1-3 (grunts, then runners). Waves 4-10 land in M4.
+// Ten waves, ~20-35 s each. Lane skews are deliberate so the preview gives
+// a reason to move things. docs/PLAN.md §2.9.
 export const WAVES: readonly WaveDef[] = [
   {
     id: 1,
@@ -103,7 +112,7 @@ export const WAVES: readonly WaveDef[] = [
   {
     id: 3,
     clearBonus: 7,
-    // Deliberate skew: lanes 2 and 3 carry the runners.
+    // Skew: lanes 2 and 3 carry the runners.
     spawns: [
       { tick: 0, lane: 0, enemy: "grunt", count: 3, spacingTicks: 30 },
       { tick: 0, lane: 1, enemy: "grunt", count: 3, spacingTicks: 30 },
@@ -111,6 +120,94 @@ export const WAVES: readonly WaveDef[] = [
       { tick: 40, lane: 3, enemy: "grunt", count: 3, spacingTicks: 30 },
       { tick: 160, lane: 2, enemy: "runner", count: 3, spacingTicks: 25 },
       { tick: 180, lane: 3, enemy: "runner", count: 3, spacingTicks: 25 },
+    ],
+  },
+  {
+    id: 4,
+    clearBonus: 8,
+    // Armored arrives, in the two outer lanes.
+    spawns: [
+      { tick: 0, lane: 0, enemy: "armored", count: 2, spacingTicks: 80 },
+      { tick: 0, lane: 3, enemy: "armored", count: 2, spacingTicks: 80 },
+      { tick: 30, lane: 1, enemy: "grunt", count: 4, spacingTicks: 30 },
+      { tick: 30, lane: 2, enemy: "grunt", count: 4, spacingTicks: 30 },
+      { tick: 220, lane: 1, enemy: "runner", count: 2, spacingTicks: 20 },
+    ],
+  },
+  {
+    id: 5,
+    clearBonus: 12,
+    // Mini-boss: Warden in lane 1 with a grunt escort spread wide.
+    spawns: [
+      { tick: 0, lane: 0, enemy: "grunt", count: 3, spacingTicks: 40 },
+      { tick: 0, lane: 3, enemy: "grunt", count: 3, spacingTicks: 40 },
+      { tick: 60, lane: 1, enemy: "warden", count: 1, spacingTicks: 0 },
+      { tick: 120, lane: 2, enemy: "runner", count: 3, spacingTicks: 30 },
+    ],
+  },
+  {
+    id: 6,
+    clearBonus: 9,
+    // Swarm: lots of small bodies in lanes 1 and 2. Rewards splash.
+    spawns: [
+      { tick: 0, lane: 1, enemy: "swarmling", count: 7, spacingTicks: 8 },
+      { tick: 0, lane: 2, enemy: "swarmling", count: 7, spacingTicks: 8 },
+      { tick: 120, lane: 0, enemy: "grunt", count: 3, spacingTicks: 30 },
+      { tick: 120, lane: 3, enemy: "armored", count: 1, spacingTicks: 0 },
+      { tick: 200, lane: 1, enemy: "swarmling", count: 6, spacingTicks: 8 },
+    ],
+  },
+  {
+    id: 7,
+    clearBonus: 10,
+    // Skew hard left: lanes 0 and 1 take almost everything.
+    spawns: [
+      { tick: 0, lane: 0, enemy: "armored", count: 3, spacingTicks: 60 },
+      { tick: 20, lane: 1, enemy: "grunt", count: 5, spacingTicks: 25 },
+      { tick: 100, lane: 0, enemy: "runner", count: 4, spacingTicks: 20 },
+      { tick: 160, lane: 1, enemy: "swarmling", count: 6, spacingTicks: 8 },
+      { tick: 240, lane: 3, enemy: "runner", count: 2, spacingTicks: 20 },
+    ],
+  },
+  {
+    id: 8,
+    clearBonus: 11,
+    // Skew hard right, faster.
+    spawns: [
+      { tick: 0, lane: 3, enemy: "armored", count: 3, spacingTicks: 50 },
+      { tick: 0, lane: 2, enemy: "runner", count: 5, spacingTicks: 18 },
+      { tick: 80, lane: 3, enemy: "swarmling", count: 8, spacingTicks: 7 },
+      { tick: 140, lane: 2, enemy: "grunt", count: 5, spacingTicks: 22 },
+      { tick: 200, lane: 0, enemy: "grunt", count: 2, spacingTicks: 30 },
+    ],
+  },
+  {
+    id: 9,
+    clearBonus: 12,
+    // Everything, everywhere, in two pulses.
+    spawns: [
+      { tick: 0, lane: 0, enemy: "runner", count: 4, spacingTicks: 18 },
+      { tick: 0, lane: 1, enemy: "armored", count: 2, spacingTicks: 60 },
+      { tick: 0, lane: 2, enemy: "swarmling", count: 8, spacingTicks: 7 },
+      { tick: 0, lane: 3, enemy: "grunt", count: 5, spacingTicks: 24 },
+      { tick: 220, lane: 0, enemy: "armored", count: 2, spacingTicks: 50 },
+      { tick: 220, lane: 1, enemy: "swarmling", count: 8, spacingTicks: 7 },
+      { tick: 220, lane: 2, enemy: "runner", count: 4, spacingTicks: 18 },
+      { tick: 220, lane: 3, enemy: "armored", count: 2, spacingTicks: 50 },
+    ],
+  },
+  {
+    id: 10,
+    clearBonus: 25,
+    // Bulwark spawns in lane 1 and shifts to lane 2 halfway. Escort keeps the flanks busy.
+    spawns: [
+      { tick: 0, lane: 0, enemy: "grunt", count: 4, spacingTicks: 30 },
+      { tick: 0, lane: 3, enemy: "grunt", count: 4, spacingTicks: 30 },
+      { tick: 40, lane: 1, enemy: "bulwark", count: 1, spacingTicks: 0 },
+      { tick: 100, lane: 2, enemy: "armored", count: 2, spacingTicks: 60 },
+      { tick: 200, lane: 0, enemy: "runner", count: 3, spacingTicks: 20 },
+      { tick: 200, lane: 3, enemy: "runner", count: 3, spacingTicks: 20 },
+      { tick: 300, lane: 1, enemy: "swarmling", count: 6, spacingTicks: 8 },
     ],
   },
 ];

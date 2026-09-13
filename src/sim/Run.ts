@@ -23,9 +23,20 @@ export interface ShopOffer {
 
 export type BuyResult =
   | PlacementResult
-  | { readonly ok: false; readonly reason: "notEnoughGold" | "noOffer" | "locked" };
+  | {
+      readonly ok: false;
+      readonly reason: "notEnoughGold" | "noOffer" | "locked" | "benchFull" | "benchEmpty";
+    };
 
 export const SHOP_SIZE = 4;
+export const REROLL_BASE_COST = 2;
+
+/** An owned item that is not in the grid. */
+export interface BenchItem {
+  readonly id: string;
+  readonly defId: string;
+  readonly tier: Tier;
+}
 
 export interface RunOptions {
   readonly seed: number;
@@ -46,6 +57,8 @@ export class Run {
   private _baseHp: number;
   private _waveIndex = 0;
   private _offers: (ShopOffer | null)[] = [];
+  private _bench: BenchItem | null = null;
+  private _rerolls = 0;
   private nextItemId = 1;
   private sim: WaveSim | undefined;
   private waveEvents: TaggedEvent[] = [];
@@ -90,6 +103,12 @@ export class Run {
   get locked(): boolean {
     return this._phase !== "shop";
   }
+  get bench(): BenchItem | null {
+    return this._bench;
+  }
+  get rerollCost(): number {
+    return REROLL_BASE_COST + this._rerolls;
+  }
 
   // --------------------------------------------------------------- shop
 
@@ -106,24 +125,86 @@ export class Run {
     return !!o && o.cost <= this._gold;
   }
 
-  /** Buy offer `index` and place it. Fails atomically. */
-  buy(index: number, anchor: Cell, orientation: Orientation = 0): BuyResult {
+  /** Re-roll all offers. Cost rises by one per reroll within the same shop. */
+  reroll(): boolean {
+    if (this.locked || this.rerollCost > this._gold) return false;
+    this._gold -= this.rerollCost;
+    this._rerolls++;
+    this.rollOffers();
+    return true;
+  }
+
+  private takeOffer(index: number): { def: ItemDef; id: string } | BuyResult {
     if (this.locked) return { ok: false, reason: "locked" };
     const offer = this._offers[index];
     if (!offer) return { ok: false, reason: "noOffer" };
     if (offer.cost > this._gold) return { ok: false, reason: "notEnoughGold" };
-    const def = itemDef(offer.defId);
-    const id = `${def.id}#${this.nextItemId}`;
+    return { def: itemDef(offer.defId), id: `${offer.defId}#${this.nextItemId}` };
+  }
+
+  private commitOffer(index: number): void {
+    const offer = this._offers[index]!;
+    this.nextItemId++;
+    this._gold -= offer.cost;
+    this._offers[index] = null;
+  }
+
+  /** Buy offer `index` and place it. Fails atomically. */
+  buy(index: number, anchor: Cell, orientation: Orientation = 0): BuyResult {
+    const taken = this.takeOffer(index);
+    if ("ok" in taken) return taken;
     const res = this.backpack.place(
-      { id, defId: def.id, tier: 1, shape: def.shape },
+      { id: taken.id, defId: taken.def.id, tier: 1, shape: taken.def.shape },
       anchor,
       orientation,
     );
     if (!res.ok) return res;
-    this.nextItemId++;
-    this._gold -= offer.cost;
-    this._offers[index] = null;
+    this.commitOffer(index);
     return { ok: true };
+  }
+
+  /** Buy an offer straight onto the bench. */
+  buyToBench(index: number): BuyResult {
+    if (this._bench) return { ok: false, reason: "benchFull" };
+    const taken = this.takeOffer(index);
+    if ("ok" in taken) return taken;
+    this._bench = { id: taken.id, defId: taken.def.id, tier: 1 };
+    this.commitOffer(index);
+    return { ok: true };
+  }
+
+  /** Move a grid item to the empty bench. */
+  toBench(itemId: string): BuyResult {
+    if (this.locked) return { ok: false, reason: "locked" };
+    if (this._bench) return { ok: false, reason: "benchFull" };
+    const it = this.backpack.get(itemId);
+    if (!it) return { ok: false, reason: "unknownItem" };
+    this.backpack.remove(itemId);
+    this._bench = { id: it.id, defId: it.defId, tier: it.tier };
+    return { ok: true };
+  }
+
+  /** Place the bench item into the grid. */
+  fromBench(anchor: Cell, orientation: Orientation = 0): BuyResult {
+    if (this.locked) return { ok: false, reason: "locked" };
+    const b = this._bench;
+    if (!b) return { ok: false, reason: "benchEmpty" };
+    const res = this.backpack.place(
+      { id: b.id, defId: b.defId, tier: b.tier, shape: itemDef(b.defId).shape },
+      anchor,
+      orientation,
+    );
+    if (!res.ok) return res;
+    this._bench = null;
+    return { ok: true };
+  }
+
+  sellBench(): number | undefined {
+    if (this.locked || !this._bench) return undefined;
+    const price = Run.sellPrice(itemDef(this._bench.defId), this._bench.tier);
+    this._bench = null;
+    this._gold += price;
+    return price;
   }
 
   /** Sell price: half the base cost, doubled per tier above 1, rounded down. */
@@ -211,6 +292,7 @@ export class Run {
     } else {
       this._waveIndex++;
       this._phase = "shop";
+      this._rerolls = 0;
       this.rollOffers();
     }
   }

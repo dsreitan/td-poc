@@ -17,7 +17,7 @@ import { DEFAULT_MODIFIERS, LANE_LENGTH, type RunModifiers } from "../modifiers.
 import type { Rng } from "../rng.ts";
 import { deriveBuffs, sumBuff, type OnHitStatus } from "./buffs.ts";
 import { LANES } from "./constants.ts";
-import { enemyDef, type EnemyDef } from "./enemies.ts";
+import { enemyDef, switchedLane, type EnemyDef } from "./enemies.ts";
 import { expandSpawns, type WaveDef } from "./waves.ts";
 
 interface StatusState {
@@ -29,9 +29,14 @@ interface StatusState {
 export interface EnemyState {
   readonly id: number;
   readonly def: EnemyDef;
-  readonly lane: number;
+  lane: number;
   pos: number;
   hp: number;
+  /** Mutable copies so boss phases can change them. */
+  armor: number;
+  speed: number;
+  immuneTicks: number;
+  nextPhase: number;
   slow?: StatusState;
   burn?: StatusState;
 }
@@ -75,6 +80,8 @@ export interface WaveSnapshot {
     pos: number;
     hp: number;
     maxHp: number;
+    immune: boolean;
+    isBoss: boolean;
   }[];
   readonly weapons: readonly { itemId: string; cooldown: number; cooldownTicks: number }[];
   readonly defenses: readonly { itemId: string; charges: number }[];
@@ -178,6 +185,8 @@ export class WaveSim {
         pos: e.pos,
         hp: e.hp,
         maxHp: e.def.hp,
+        immune: e.immuneTicks > 0,
+        isBoss: e.def.isBoss === true,
       })),
       weapons: this.weapons.map((w) => ({
         itemId: w.item.id,
@@ -198,6 +207,7 @@ export class WaveSim {
     this.spawn(out);
     this.fireWeapons(out);
     this.tickStatuses(out);
+    this.tickPhases(out);
     this.moveEnemies(out);
     this.checkEnd(out);
 
@@ -217,6 +227,10 @@ export class WaveSim {
         lane: s.lane,
         pos: LANE_LENGTH,
         hp: def.hp,
+        armor: def.armor,
+        speed: def.speed,
+        immuneTicks: 0,
+        nextPhase: 0,
       };
       this.enemies.push(e);
       out.push({ t: "enemySpawned", id: e.id, type: def.id, lane: e.lane });
@@ -268,6 +282,7 @@ export class WaveSim {
 
   private tickStatuses(out: SimEvent[]): void {
     for (const e of this.enemies) {
+      if (e.immuneTicks > 0) e.immuneTicks--;
       if (e.burn) {
         this.damage(
           e,
@@ -291,9 +306,7 @@ export class WaveSim {
 
   private moveEnemies(out: SimEvent[]): void {
     for (const e of this.enemies) {
-      const speed = e.slow
-        ? Math.floor((e.def.speed * (100 - e.slow.magnitude)) / 100)
-        : e.def.speed;
+      const speed = e.slow ? Math.floor((e.speed * (100 - e.slow.magnitude)) / 100) : e.speed;
       e.pos = Math.max(0, e.pos - speed);
       out.push({ t: "enemyMoved", id: e.id, pos: e.pos });
       if (e.pos === 0) this.breach(e, out);
@@ -305,7 +318,18 @@ export class WaveSim {
   private breach(e: EnemyState, out: SimEvent[]): void {
     const top = this.bp.topItemInColumn(e.lane);
     const def = top ? this.defenses.get(top.id) : undefined;
-    if (top && def && def.charges > 0) {
+    if (e.def.stripsCharges) {
+      // A boss is never bounced. It tears the charges off every defensive
+      // item covering its lane and hits the base anyway.
+      for (const d of this.defenses.values()) {
+        if (d.charges > 0 && this.bp.coverage(d.item.id).includes(e.lane)) {
+          d.charges = 0;
+          out.push({ t: "itemChargeUsed", itemId: d.item.id, remaining: 0 });
+        }
+      }
+      this.baseHp = Math.max(0, this.baseHp - e.def.breachDamage);
+      out.push({ t: "breach", id: e.id, lane: e.lane, baseDamage: e.def.breachDamage });
+    } else if (top && def && def.charges > 0) {
       def.charges--;
       out.push({ t: "itemChargeUsed", itemId: top.id, remaining: def.charges });
       out.push({ t: "breach", id: e.id, lane: e.lane, absorbedBy: top.id, baseDamage: 0 });
@@ -335,6 +359,39 @@ export class WaveSim {
     }
     if (this.result) {
       out.push({ t: "waveEnded", result: this.result, ticks: this.t + 1, baseHp: this.baseHp });
+    }
+  }
+
+  /** Fire boss phases whose trigger is met. One phase per enemy per tick. */
+  private tickPhases(out: SimEvent[]): void {
+    for (const e of this.enemies) {
+      const phases = e.def.phases;
+      if (!phases || e.nextPhase >= phases.length || e.hp <= 0) continue;
+      const ph = phases[e.nextPhase]!;
+      const tr = ph.trigger;
+      const met =
+        (tr.kind === "hpBelowPct" && e.hp * 100 < e.def.hp * tr.value) ||
+        (tr.kind === "positionBelow" && e.pos < tr.value) ||
+        (tr.kind === "tick" && this.t >= tr.value);
+      if (!met) continue;
+      const phase = e.nextPhase++;
+      out.push({ t: "bossPhaseEntered", bossId: e.id, phase });
+      for (const eff of ph.effects) {
+        switch (eff.kind) {
+          case "immune":
+            e.immuneTicks = Math.max(e.immuneTicks, eff.ticks);
+            break;
+          case "setArmor":
+            e.armor = eff.value;
+            break;
+          case "setSpeed":
+            e.speed = eff.value;
+            break;
+          case "switchLane":
+            e.lane = switchedLane(e.lane, eff.offset, LANES);
+            break;
+        }
+      }
     }
   }
 
@@ -369,7 +426,11 @@ export class WaveSim {
     out: SimEvent[],
   ): void {
     if (e.hp <= 0) return;
-    const amount = ignoresArmor ? raw : Math.max(1, raw - e.def.armor);
+    if (e.immuneTicks > 0) {
+      out.push({ t: "enemyDamaged", id: e.id, amount: 0, hp: e.hp, source, overkill: 0 });
+      return;
+    }
+    const amount = ignoresArmor ? raw : Math.max(1, raw - e.armor);
     const before = e.hp;
     e.hp = before - amount;
     const overkill = e.hp < 0 ? -e.hp : 0;
