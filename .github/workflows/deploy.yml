@@ -15,6 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Creates the Pages site (source: GitHub Actions) on first run, so no
+      # manual Settings -> Pages step is needed.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: voidzero-dev/setup-vp@v1.20.0
         with:
           node-version: "24"
